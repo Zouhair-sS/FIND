@@ -42,16 +42,29 @@ export default function ProductDetailClient({ product }: { product: Product }) {
 
   // Find variant that matches selections
   const selectBySpec = (color?: string, storage?: number) => {
-    const match = variants.find(
+    // Try to find exact match for both color and storage
+    let match = variants.find(
       (v) =>
         (color ? v.color === color : v.color === selectedVariant.color) &&
         (storage !== undefined ? v.storage_gb === storage : v.storage_gb === selectedVariant.storage_gb)
     );
-    if (match) setSelectedVariant(match);
 
-    // If color was changed, switch the main image to match
-    if (color && color !== selectedVariant.color && colorToImageIndex[color] !== undefined) {
-      setSelectedImageIdx(colorToImageIndex[color]);
+    // Fallback: If exact match not found, just pick the first one matching the new spec
+    if (!match) {
+      if (color) {
+        match = variants.find((v) => v.color === color);
+      } else if (storage !== undefined) {
+        match = variants.find((v) => v.storage_gb === storage);
+      }
+    }
+
+    if (match) {
+      setSelectedVariant(match);
+      // If color was changed (or we fell back to a different color), switch main image to match
+      const newColor = match.color;
+      if (newColor && colorToImageIndex[newColor] !== undefined) {
+        setSelectedImageIdx(colorToImageIndex[newColor]);
+      }
     }
   };
 
