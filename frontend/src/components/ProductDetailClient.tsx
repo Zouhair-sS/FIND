@@ -2,70 +2,85 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import type { Product, ProductVariant } from "@/lib/api";
 
+const COLOR_MAP: Record<string, string> = {
+  "Midnight": "#1c1f24",
+  "Starlight": "#f0e4d3",
+  "Silver": "#e3e4e5",
+  "Skyblue": "#b0c4de",
+  "Space Black": "#2e2e2e",
+  "Black": "#000000",
+  "Titanium Gray": "#878681",
+  "Titanium Violet": "#5b5666",
+  "Obsidian": "#222222",
+  "Porcelain": "#f4f4f0",
+  "Teal": "#008080",
+  "Ultramarine": "#120a8f",
+  "White": "#ffffff",
+  "Intense Blue": "#234e70",
+  "Orange": "#e37424"
+};
+
 export default function ProductDetailClient({ product }: { product: Product }) {
-  const variants = product.variants ?? [];
-  const images = product.images ?? [];
-  const [selectedVariant, setSelectedVariant] = useState<ProductVariant>(variants[0]);
-  const [selectedImageIdx, setSelectedImageIdx] = useState(0);
-  const [quantity, setQuantity] = useState(1);
-
-  useEffect(() => {
-    if (variants.length > 0) setSelectedVariant(variants[0]);
-  }, [variants]);
-
-  if (!selectedVariant) return null;
-
-  const price = parseFloat(selectedVariant.price);
-  const inStock = selectedVariant.stock_quantity > 0;
+  const variants = useMemo(() => product.variants ?? [], [product.variants]);
+  const images = useMemo(() => product.images ?? [], [product.images]);
 
   // Unique colors
   const colors = [...new Set(variants.map((v) => v.color).filter(Boolean))] as string[];
-
   // Unique storage options
   const storageOptions = [...new Set(variants.map((v) => v.storage_gb).filter(Boolean))] as number[];
 
+  const [selectedColor, setSelectedColor] = useState<string>(colors[0] ?? "");
+  const [selectedStorage, setSelectedStorage] = useState<number | null | undefined>(
+    storageOptions.length > 0 ? [...storageOptions].sort((a,b)=>a-b)[0] : undefined
+  );
+  const [selectedImageIdx, setSelectedImageIdx] = useState(0);
+  const [quantity, setQuantity] = useState(1);
+  const [addedToCart, setAddedToCart] = useState(false);
+
+  // Derive current exact variant or fallback
+  const currentVariant = useMemo(() => {
+    return variants.find((v) => v.color === selectedColor && v.storage_gb === selectedStorage);
+  }, [variants, selectedColor, selectedStorage]);
+
+  const fallbackVariant = currentVariant ?? variants.find(v => v.color === selectedColor) ?? variants[0];
+  if (!fallbackVariant) return null;
+
+  const price = currentVariant ? parseFloat(currentVariant.price) : parseFloat(fallbackVariant.price);
+  const inStock = currentVariant ? currentVariant.stock_quantity > 0 : false;
+  
+  // Base variant for price diff logic
+  const baseStorage = storageOptions.length > 0 ? [...storageOptions].sort((a,b)=>a-b)[0] : undefined;
+  const baseVariant = variants.find(v => v.color === selectedColor && v.storage_gb === baseStorage) ?? fallbackVariant;
+  const basePrice = parseFloat(baseVariant.price);
+
   const formatStorage = (gb: number) => (gb >= 1024 ? `${gb / 1024}TB` : `${gb}GB`);
 
-  // Build a map: color name → best matching image index
-  const colorToImageIndex: Record<string, number> = {};
-  colors.forEach((color) => {
-    const colorLower = color.toLowerCase();
+  const handleColorChange = (color: string) => {
+    setSelectedColor(color);
+    // Auto-select storage if current storage is not available in new color
+    const hasCurrentStorage = variants.some(v => v.color === color && v.storage_gb === selectedStorage);
+    if (!hasCurrentStorage) {
+      const availableStorage = variants.find(v => v.color === color)?.storage_gb;
+      if (availableStorage !== undefined) setSelectedStorage(availableStorage);
+    }
+    
+    // Switch image
+    const colorTokens = color.toLowerCase().split(' ');
     const idx = images.findIndex((img) => {
       const urlDecoded = decodeURIComponent(img.url).toLowerCase();
-      return urlDecoded.includes(colorLower);
+      return colorTokens.some(token => token.length >= 3 && urlDecoded.includes(token));
     });
-    if (idx !== -1) colorToImageIndex[color] = idx;
-  });
-
-  // Find variant that matches selections
-  const selectBySpec = (color?: string, storage?: number) => {
-    // Try to find exact match for both color and storage
-    let match = variants.find(
-      (v) =>
-        (color ? v.color === color : v.color === selectedVariant.color) &&
-        (storage !== undefined ? v.storage_gb === storage : v.storage_gb === selectedVariant.storage_gb)
-    );
-
-    // Fallback: If exact match not found, just pick the first one matching the new spec
-    if (!match) {
-      if (color) {
-        match = variants.find((v) => v.color === color);
-      } else if (storage !== undefined) {
-        match = variants.find((v) => v.storage_gb === storage);
-      }
+    if (idx !== -1) {
+      setSelectedImageIdx(idx);
     }
+  };
 
-    if (match) {
-      setSelectedVariant(match);
-      // If color was changed (or we fell back to a different color), switch main image to match
-      const newColor = match.color;
-      if (newColor && colorToImageIndex[newColor] !== undefined) {
-        setSelectedImageIdx(colorToImageIndex[newColor]);
-      }
-    }
+  const handleAddToCart = () => {
+    setAddedToCart(true);
+    setTimeout(() => setAddedToCart(false), 2000);
   };
 
   return (
@@ -82,7 +97,7 @@ export default function ProductDetailClient({ product }: { product: Product }) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
         {/* ── Left: Images ──────────────────────────────────── */}
         <div>
-          <div className="relative aspect-square bg-gray-50 rounded-xl overflow-hidden mb-4">
+          <div className="relative aspect-square rounded-xl overflow-hidden mb-4">
             {images[selectedImageIdx] ? (
               <Image
                 src={images[selectedImageIdx].url}
@@ -131,19 +146,25 @@ export default function ProductDetailClient({ product }: { product: Product }) {
             <div className="mt-6">
               <h4 className="text-xs font-semibold tracking-wider text-gray-500 uppercase mb-3">Color</h4>
               <div className="flex gap-2">
-                {colors.map((color) => (
-                  <button
-                    key={color}
-                    onClick={() => selectBySpec(color, undefined)}
-                    className={`px-4 py-2 text-sm rounded-lg border transition-colors ${
-                      selectedVariant.color === color
-                        ? "border-blue-500 text-blue-600 bg-blue-50"
-                        : "border-gray-200 text-gray-600 hover:border-gray-300"
-                    }`}
-                  >
-                    {color}
-                  </button>
-                ))}
+                {colors.map((color) => {
+                  const hex = COLOR_MAP[color] || "#cccccc";
+                  const isSelected = selectedColor === color;
+                  return (
+                    <button
+                      key={color}
+                      onClick={() => handleColorChange(color)}
+                      className={`w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer ${
+                        isSelected ? "ring-2 ring-offset-2 ring-gray-900 scale-110" : "hover:scale-110 opacity-70 hover:opacity-100"
+                      }`}
+                      title={color}
+                    >
+                      <span
+                        className="w-full h-full rounded-full border border-gray-200"
+                        style={{ backgroundColor: hex }}
+                      />
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -153,28 +174,32 @@ export default function ProductDetailClient({ product }: { product: Product }) {
             <div className="mt-6">
               <h4 className="text-xs font-semibold tracking-wider text-gray-500 uppercase mb-3">Configuration</h4>
               <div className="flex gap-2">
-                {storageOptions.sort((a, b) => a - b).map((gb) => {
-                  const isSelected = selectedVariant.storage_gb === gb;
+                {[...storageOptions].sort((a, b) => a - b).map((gb) => {
+                  const isSelected = selectedStorage === gb;
                   const matchVariant = variants.find(
-                    (v) => v.storage_gb === gb && v.color === selectedVariant.color
+                    (v) => v.storage_gb === gb && v.color === selectedColor
                   );
-                  const priceDiff = matchVariant ? parseFloat(matchVariant.price) - parseFloat(variants[0].price) : 0;
+                  const priceDiff = matchVariant ? parseFloat(matchVariant.price) - basePrice : 0;
+                  const isAvailable = !!matchVariant;
 
                   return (
                     <button
                       key={gb}
-                      onClick={() => selectBySpec(undefined, gb)}
-                      className={`px-4 py-2 text-sm rounded-lg border transition-colors ${
+                      disabled={!isAvailable}
+                      onClick={() => setSelectedStorage(gb)}
+                      className={`px-4 py-2 text-sm rounded-lg border transition-all duration-200 ${
+                        !isAvailable ? "opacity-50 cursor-not-allowed bg-gray-50 border-gray-100" :
                         isSelected
-                          ? "border-blue-500 text-blue-600 bg-blue-50"
-                          : "border-gray-200 text-gray-600 hover:border-gray-300"
+                          ? "border-gray-900 text-gray-900 bg-gray-50 shadow-sm"
+                          : "border-gray-200 text-gray-600 hover:border-gray-400 hover:bg-gray-50 cursor-pointer"
                       }`}
                     >
                       <span className="font-medium">{formatStorage(gb)}</span>
-                      {priceDiff > 0 && (
-                        <span className="block text-xs text-blue-500">+${priceDiff}</span>
+                      {isAvailable && priceDiff > 0 && (
+                        <span className="block text-xs text-gray-500">+${priceDiff}</span>
                       )}
-                      {priceDiff === 0 && <span className="block text-xs text-gray-400">base</span>}
+                      {isAvailable && priceDiff === 0 && <span className="block text-xs text-gray-400">base</span>}
+                      {!isAvailable && <span className="block text-xs text-gray-400">N/A</span>}
                     </button>
                   );
                 })}
@@ -187,27 +212,51 @@ export default function ProductDetailClient({ product }: { product: Product }) {
             <div className="flex items-center border border-gray-200 rounded-lg">
               <button
                 onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                className="px-3 py-2 text-gray-500 hover:text-gray-900 transition-colors"
+                disabled={quantity <= 1}
+                className={`px-3 py-2 transition-colors cursor-pointer ${
+                  quantity <= 1
+                    ? "text-gray-300 cursor-not-allowed"
+                    : "text-gray-500 hover:text-gray-900 hover:bg-gray-50"
+                }`}
               >
                 −
               </button>
-              <span className="px-4 py-2 text-sm font-medium">{quantity}</span>
+              <span className="px-4 py-2 text-sm font-medium min-w-[40px] text-center">{quantity}</span>
               <button
                 onClick={() => setQuantity(quantity + 1)}
-                className="px-3 py-2 text-gray-500 hover:text-gray-900 transition-colors"
+                disabled={!inStock}
+                className={`px-3 py-2 transition-colors cursor-pointer ${
+                  !inStock
+                    ? "text-gray-300 cursor-not-allowed"
+                    : "text-gray-500 hover:text-gray-900 hover:bg-gray-50"
+                }`}
               >
                 +
               </button>
             </div>
             <button
               disabled={!inStock}
-              className={`flex-1 py-3 text-sm font-medium rounded-lg transition-colors ${
-                inStock
-                  ? "bg-gray-900 text-white hover:bg-gray-800"
-                  : "bg-gray-100 text-gray-400 cursor-not-allowed"
+              onClick={handleAddToCart}
+              className={`flex-1 py-3 text-sm font-medium rounded-lg transition-all duration-200 cursor-pointer ${
+                addedToCart
+                  ? "bg-green-600 text-white"
+                  : inStock
+                    ? "bg-gray-900 text-white hover:bg-gray-800 active:scale-[0.98]"
+                    : "bg-gray-100 text-gray-400 cursor-not-allowed"
               }`}
             >
-              {inStock ? "Add to cart" : "Out of stock"}
+              {addedToCart ? (
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Added to cart!
+                </span>
+              ) : inStock ? (
+                "Add to cart"
+              ) : (
+                "Out of stock"
+              )}
             </button>
           </div>
 
@@ -215,38 +264,38 @@ export default function ProductDetailClient({ product }: { product: Product }) {
           <div className="mt-10 border-t border-gray-100 pt-6">
             <h4 className="text-xs font-semibold tracking-wider text-gray-500 uppercase mb-4">Tech Specs</h4>
             <dl className="space-y-3">
-              {selectedVariant.processor && (
+              {fallbackVariant.processor && (
                 <div className="flex justify-between text-sm">
                   <dt className="text-gray-500">Processor</dt>
-                  <dd className="text-gray-900 font-medium">{selectedVariant.processor}</dd>
+                  <dd className="text-gray-900 font-medium">{fallbackVariant.processor}</dd>
                 </div>
               )}
-              {selectedVariant.ram_gb && (
+              {fallbackVariant.ram_gb && (
                 <div className="flex justify-between text-sm">
                   <dt className="text-gray-500">Memory</dt>
-                  <dd className="text-gray-900 font-medium">{selectedVariant.ram_gb}GB unified</dd>
+                  <dd className="text-gray-900 font-medium">{fallbackVariant.ram_gb}GB unified</dd>
                 </div>
               )}
-              {selectedVariant.storage_gb && (
+              {selectedStorage && (
                 <div className="flex justify-between text-sm">
                   <dt className="text-gray-500">Storage</dt>
-                  <dd className="text-gray-900 font-medium">{formatStorage(selectedVariant.storage_gb)} SSD</dd>
+                  <dd className="text-gray-900 font-medium">{formatStorage(selectedStorage)} SSD</dd>
                 </div>
               )}
-              {selectedVariant.screen_size && (
+              {fallbackVariant.screen_size && (
                 <div className="flex justify-between text-sm">
                   <dt className="text-gray-500">Display</dt>
-                  <dd className="text-gray-900 font-medium">{selectedVariant.screen_size}&quot;</dd>
+                  <dd className="text-gray-900 font-medium">{fallbackVariant.screen_size}&quot;</dd>
                 </div>
               )}
-              {selectedVariant.color && (
+              {selectedColor && (
                 <div className="flex justify-between text-sm">
                   <dt className="text-gray-500">Color</dt>
-                  <dd className="text-gray-900 font-medium">{selectedVariant.color}</dd>
+                  <dd className="text-gray-900 font-medium">{selectedColor}</dd>
                 </div>
               )}
-              {selectedVariant.attributes &&
-                Object.entries(selectedVariant.attributes).map(([key, val]) => (
+              {fallbackVariant.attributes &&
+                Object.entries(fallbackVariant.attributes).map(([key, val]) => (
                   <div key={key} className="flex justify-between text-sm">
                     <dt className="text-gray-500 capitalize">{key.replace(/_/g, " ")}</dt>
                     <dd className="text-gray-900 font-medium">{String(val)}</dd>
@@ -256,7 +305,7 @@ export default function ProductDetailClient({ product }: { product: Product }) {
           </div>
 
           {/* SKU */}
-          <p className="mt-6 text-xs text-gray-400">SKU: {selectedVariant.sku}</p>
+          {currentVariant && <p className="mt-6 text-xs text-gray-400">SKU: {currentVariant.sku}</p>}
         </div>
       </div>
     </div>

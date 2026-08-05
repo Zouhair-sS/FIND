@@ -12,5 +12,6 @@ Route::get('/user', function (Request $request) {
 Route::get('/categories', [CategoryController::class, 'index']);
 Route::get('/categories/{slug}', [CategoryController::class, 'show']);
 
+Route::get('/products/search', [ProductController::class, 'search']);
 Route::get('/products', [ProductController::class, 'index']);
 Route::get('/products/{slug}', [ProductController::class, 'show']);

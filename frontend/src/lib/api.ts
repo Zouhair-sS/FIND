@@ -78,3 +78,11 @@ export async function fetchProductBySlug(slug: string): Promise<Product> {
   if (!res.ok) throw new Error("Failed to fetch product");
   return res.json();
 }
+
+export async function searchProducts(query: string): Promise<Product[]> {
+  const res = await fetch(`${API_BASE}/products/search?q=${encodeURIComponent(query)}`, {
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error("Failed to search products");
+  return res.json();
+}

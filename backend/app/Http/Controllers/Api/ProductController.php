@@ -38,4 +38,28 @@ class ProductController extends Controller
 
         return response()->json($product);
     }
+
+    public function search()
+    {
+        $query = request()->input('q', '');
+
+        if (strlen($query) < 1) {
+            return response()->json([]);
+        }
+
+        $products = Product::where('status', 'active')
+            ->where(function ($q) use ($query) {
+                $q->where('name', 'LIKE', "%{$query}%")
+                  ->orWhere('brand', 'LIKE', "%{$query}%");
+            })
+            ->with(['images' => function ($q) {
+                $q->orderBy('sort_order')->limit(1);
+            }, 'category', 'variants' => function ($q) {
+                $q->orderBy('price')->limit(1);
+            }])
+            ->limit(8)
+            ->get();
+
+        return response()->json($products);
+    }
 }
