@@ -4,8 +4,10 @@ import Link from "next/link";
 import Image from "next/image";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
 import type { Product } from "@/lib/api";
 import { useCart } from "./CartContext";
+import { useAuth } from "@/components/AuthContext";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api";
 
@@ -20,8 +22,10 @@ const placeholders = ["what are you looking for ?", "iphone 16", "macbook pro"];
 
 export default function Navbar() {
   const { itemCount, setIsCartOpen } = useCart();
+  const { user, isAuthenticated, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<Product[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -107,11 +111,17 @@ export default function Navbar() {
 
   // Close search on click outside
   useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
         setSearchOpen(false);
       }
-    }
+      // We will handle userMenu outside click inline or with another ref, 
+      // but for simplicity we can just listen to any click
+      const target = event.target as Element;
+      if (!target.closest('.user-menu-container')) {
+        setUserMenuOpen(false);
+      }
+    };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
@@ -267,11 +277,49 @@ export default function Navbar() {
           </div>
 
           {/* Account */}
-          <button className="p-2 text-gray-500 hover:text-gray-900 transition-colors">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
-            </svg>
-          </button>
+          <div className="relative user-menu-container">
+            <button 
+              className="p-2 text-gray-500 hover:text-gray-900 transition-colors flex items-center gap-2 cursor-pointer"
+              onClick={() => setUserMenuOpen(!userMenuOpen)}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+              </svg>
+              {isAuthenticated && user && (
+                <span className="text-sm font-medium hidden sm:block">{user.name.split(" ")[0]}</span>
+              )}
+            </button>
+
+            {userMenuOpen && (
+              <div className="absolute top-full right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-[60]">
+                {isAuthenticated ? (
+                  <>
+                    <div className="px-4 py-2 border-b border-gray-50 mb-2">
+                      <p className="text-sm font-medium text-gray-900">{user?.name}</p>
+                      <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                    </div>
+                    <Link href="/orders" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Orders</Link>
+                    <Link href="/profile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Profile</Link>
+                    <Link href="/addresses" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Addresses</Link>
+                    <button 
+                      onClick={() => {
+                        logout();
+                        setUserMenuOpen(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 mt-2 border-t border-gray-50 cursor-pointer"
+                    >
+                      Logout
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <Link href="/login" onClick={() => setUserMenuOpen(false)} className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Sign In</Link>
+                    <Link href="/register" onClick={() => setUserMenuOpen(false)} className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Create Account</Link>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Cart */}
           <button 
@@ -282,9 +330,15 @@ export default function Navbar() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007zM8.625 10.5a.375.375 0 11-.75 0 .375.375 0 01.75 0zm7.5 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
             </svg>
             {itemCount > 0 && (
-              <span className="absolute top-0 right-0 inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-bold leading-none text-white transform translate-x-1/4 -translate-y-1/4 bg-blue-600 rounded-full">
+              <motion.span 
+                key={itemCount}
+                initial={{ scale: 0.5, opacity: 0 }}
+                animate={{ scale: [1, 1.3, 1], opacity: 1 }}
+                transition={{ duration: 0.3, ease: "easeInOut" }}
+                className="absolute top-0 right-0 inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-bold leading-none text-white transform translate-x-1/4 -translate-y-1/4 bg-blue-600 rounded-full"
+              >
                 {itemCount}
-              </span>
+              </motion.span>
             )}
           </button>
 

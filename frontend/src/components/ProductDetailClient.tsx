@@ -58,7 +58,7 @@ const getScaleClass = (brand?: string | null, categorySlug?: string | null) => {
 };
 
 export default function ProductDetailClient({ product }: { product: Product }) {
-  const { addItem, items } = useCart();
+  const { addItem, items, setIsCartOpen } = useCart();
   const variants = useMemo(() => product.variants ?? [], [product.variants]);
   const images = useMemo(() => product.images ?? [], [product.images]);
 
@@ -196,7 +196,12 @@ export default function ProductDetailClient({ product }: { product: Product }) {
 
     setQuantity(1);
     setAddedToCart(true);
-    setTimeout(() => setAddedToCart(false), 2000);
+    
+    // Open drawer after a short delay to allow the "Added" animation to show
+    setTimeout(() => {
+      setIsCartOpen(true);
+      setAddedToCart(false);
+    }, 600);
   };
 
   return (

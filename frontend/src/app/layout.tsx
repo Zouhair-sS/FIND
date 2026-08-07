@@ -3,16 +3,16 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import { CartProvider } from "@/components/CartContext";
+import { AuthProvider } from "@/components/AuthContext";
+import CartDrawer from "@/components/CartDrawer";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "FIND. | Technology Store",
-  description: "Technology built for focus, not fuss. Shop laptops, smartphones, monitors, and accessories.",
+  title: "AlyaPay Showcase Store",
+  description: "A premium electronics store showcasing AlyaPay integration.",
 };
-
-import { CartProvider } from "@/components/CartContext";
-import CartDrawer from "@/components/CartDrawer";
 
 export default function RootLayout({
   children,
@@ -21,13 +21,17 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${inter.className} antialiased bg-white text-gray-900`}>
-        <CartProvider>
-          <Navbar />
-          <main className="min-h-screen">{children}</main>
-          <Footer />
-          <CartDrawer />
-        </CartProvider>
+      <body className={`${inter.className} bg-white text-gray-900 antialiased`}>
+        <AuthProvider>
+          <CartProvider>
+            <Navbar />
+            <main className="min-h-screen">
+              {children}
+            </main>
+            <Footer />
+            <CartDrawer />
+          </CartProvider>
+        </AuthProvider>
       </body>
     </html>
   );
