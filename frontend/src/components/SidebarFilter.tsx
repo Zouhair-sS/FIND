@@ -1,0 +1,144 @@
+"use client";
+
+import { useState } from "react";
+import { FilterGroup } from "@/lib/api";
+import { ChevronDown, ChevronUp } from "lucide-react";
+
+interface SidebarFilterProps {
+  filters: FilterGroup[];
+  priceRange: { min: number; max: number };
+  selectedFilters: Record<string, (string | number)[]>;
+  onFilterChange: (slug: string, value: string | number) => void;
+  selectedMaxPrice: number;
+  onPriceChange: (value: number) => void;
+  inStockOnly: boolean;
+  onInStockChange: (val: boolean) => void;
+}
+
+export default function SidebarFilter({
+  filters,
+  priceRange,
+  selectedFilters,
+  onFilterChange,
+  selectedMaxPrice,
+  onPriceChange,
+  inStockOnly,
+  onInStockChange,
+}: SidebarFilterProps) {
+  return (
+    <div className="w-full">
+      <h2 className="text-lg font-bold text-gray-900 mb-6">Filters</h2>
+
+      {/* Price Slider */}
+      {priceRange.max > priceRange.min && (
+        <div className="mb-8">
+          <h3 className="text-xs font-semibold tracking-wider text-gray-500 uppercase mb-4">Price</h3>
+          <input
+            type="range"
+            min={priceRange.min}
+            max={priceRange.max}
+            step={1}
+            value={selectedMaxPrice}
+            onChange={(e) => onPriceChange(Number(e.target.value))}
+            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-gray-900"
+          />
+          <div className="flex justify-between text-sm text-gray-500 mt-2">
+            <span>MAD {Math.round(priceRange.min).toLocaleString()}</span>
+            <span>MAD {Math.round(selectedMaxPrice).toLocaleString()}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Dynamic Filters */}
+      {filters.map((filterGroup, idx) => (
+        <FilterSection
+          key={filterGroup.slug}
+          filterGroup={filterGroup}
+          selectedValues={selectedFilters[filterGroup.slug] || []}
+          onChange={(val) => onFilterChange(filterGroup.slug, val)}
+          defaultOpen={idx < 4} // Open first 4 by default
+        />
+      ))}
+
+      {/* In Stock Only */}
+      <div className="mt-8 pt-6 border-t border-gray-100 flex items-center justify-between">
+        <span className="text-sm font-medium text-gray-900">In stock only</span>
+        <input
+          type="checkbox"
+          checked={inStockOnly}
+          onChange={(e) => onInStockChange(e.target.checked)}
+          className="w-4 h-4 text-gray-900 bg-gray-100 border-gray-300 rounded focus:ring-gray-900"
+        />
+      </div>
+    </div>
+  );
+}
+
+function FilterSection({
+  filterGroup,
+  selectedValues,
+  onChange,
+  defaultOpen,
+}: {
+  filterGroup: FilterGroup;
+  selectedValues: (string | number)[];
+  onChange: (value: string | number) => void;
+  defaultOpen: boolean;
+}) {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+
+  if (filterGroup.values.length === 0) return null;
+
+  return (
+    <div className="mb-6">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center justify-between w-full text-left"
+      >
+        <h3 className="text-xs font-semibold tracking-wider text-gray-500 uppercase">
+          {filterGroup.name}
+        </h3>
+        {isOpen ? (
+          <ChevronUp className="w-4 h-4 text-gray-400" />
+        ) : (
+          <ChevronDown className="w-4 h-4 text-gray-400" />
+        )}
+      </button>
+
+      {isOpen && (
+        <div className="mt-4 space-y-3">
+          {filterGroup.values.map((option) => {
+            const isChecked = selectedValues.includes(option.value);
+            // Format labels for RAM and Storage nicely if they are numbers
+            let label = String(option.value);
+            if (filterGroup.slug === "ram_gb") label += "GB";
+            if (filterGroup.slug === "storage_gb") {
+              label = Number(option.value) >= 1024 ? `${Number(option.value) / 1024}TB` : `${option.value}GB`;
+            }
+            if (filterGroup.slug === "screen_size") label += '"';
+
+            return (
+              <label
+                key={option.value}
+                className="flex items-center justify-between cursor-pointer group"
+              >
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    onChange={() => onChange(option.value)}
+                    className="w-4 h-4 text-gray-900 bg-gray-100 border-gray-300 rounded focus:ring-gray-900"
+                  />
+                  <span className="ml-3 text-sm text-gray-700 group-hover:text-gray-900 transition-colors">
+                    {label}
+                  </span>
+                </div>
+                <span className="text-xs text-gray-400">{option.count}</span>
+              </label>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}

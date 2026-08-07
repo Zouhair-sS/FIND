@@ -11,6 +11,9 @@ export const metadata: Metadata = {
   description: "Technology built for focus, not fuss. Shop laptops, smartphones, monitors, and accessories.",
 };
 
+import { CartProvider } from "@/components/CartContext";
+import CartDrawer from "@/components/CartDrawer";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -19,9 +22,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${inter.className} antialiased bg-white text-gray-900`}>
-        <Navbar />
-        <main className="min-h-screen">{children}</main>
-        <Footer />
+        <CartProvider>
+          <Navbar />
+          <main className="min-h-screen">{children}</main>
+          <Footer />
+          <CartDrawer />
+        </CartProvider>
       </body>
     </html>
   );

@@ -56,17 +56,51 @@ const getScaleClass = (brand?: string | null, categorySlug?: string | null) => {
   return 'scale-100 group-hover:scale-105';
 };
 
-export default function ProductCard({ product }: { product: Product }) {
-  const firstVariant = product.variants?.[0];
-  const firstImage = product.images?.[0];
-  const price = firstVariant ? parseFloat(firstVariant.price) : 0;
+export default function ProductCard({ 
+  product, 
+  activeFilters = {},
+  activeMaxPrice = Infinity
+}: { 
+  product: Product;
+  activeFilters?: Record<string, (string | number)[]>;
+  activeMaxPrice?: number;
+}) {
+  // Compute the cheapest matching variant
+  const variantLevelSlugs = ["ram_gb", "storage_gb", "processor", "screen_size"];
+  
+  const activeVariantFilters = Object.entries(activeFilters).filter(
+    ([slug, values]) => variantLevelSlugs.includes(slug) && values.length > 0
+  );
+
+  let bestPrice = 0;
+
+  if (product.variants && product.variants.length > 0) {
+    const matchingVariants = product.variants.filter((variant) => {
+      const vPrice = parseFloat(variant.price);
+      if (vPrice > activeMaxPrice) return false;
+
+      for (const [slug, values] of activeVariantFilters) {
+        const vVal = variant[slug as keyof typeof variant];
+        if (!values.map(String).includes(String(vVal))) return false;
+      }
+      return true;
+    });
+
+    if (matchingVariants.length > 0) {
+      bestPrice = Math.min(...matchingVariants.map(v => parseFloat(v.price)));
+    } else {
+      bestPrice = Math.min(...product.variants.map(v => parseFloat(v.price)));
+    }
+  }
+
+  const price = bestPrice;
   
   // Extract unique colors
   const colors = Array.from(new Set(product.variants?.map(v => v.color).filter(Boolean))) as string[];
   const [selectedColor, setSelectedColor] = useState<string | null>(colors.length > 0 ? colors[0] : null);
 
   // Find image for selected color
-  let displayImageUrl = firstImage?.url;
+  let displayImageUrl = product.images?.[0]?.url;
   if (selectedColor && product.images) {
     const selectedTokens = selectedColor.toLowerCase().split(' ');
     let bestMatch = null;
@@ -84,7 +118,7 @@ export default function ProductCard({ product }: { product: Product }) {
       }
     });
     if (bestMatch && maxScore > 0) {
-      displayImageUrl = (bestMatch as any).url;
+      displayImageUrl = (bestMatch as import("@/lib/api").ProductImage).url;
     }
   }
 
@@ -92,13 +126,13 @@ export default function ProductCard({ product }: { product: Product }) {
     <div className="group block mb-6">
       <Link href={`/product/${product.slug}`} className="block">
         {/* Image */}
-        <div className="relative aspect-square mb-4 flex items-center justify-center">
+        <div className="relative aspect-square mb-4 flex items-center justify-center overflow-hidden rounded-2xl">
           {displayImageUrl ? (
             <Image
               src={displayImageUrl}
               alt={product.name}
               fill
-              className={`object-contain transition-transform duration-300 ${getScaleClass(product.brand, product.category?.slug)}`}
+              className={`object-contain p-4 transition-transform duration-300 ${getScaleClass(product.brand?.name, product.category?.slug)}`}
               sizes="(max-width: 768px) 50vw, 25vw"
             />
           ) : (
@@ -116,7 +150,7 @@ export default function ProductCard({ product }: { product: Product }) {
         </h3>
 
         <p className="text-sm text-gray-500 mt-1">
-          {price > 0 ? `$${price.toLocaleString()}` : "Price unavailable"}
+          {price > 0 ? `MAD ${Math.round(price).toLocaleString()}` : "Price unavailable"}
         </p>
       </Link>
 

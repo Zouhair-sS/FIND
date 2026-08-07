@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import type { Product } from "@/lib/api";
+import { useCart } from "./CartContext";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api";
 
@@ -18,6 +19,7 @@ const NAV_LINKS = [
 const placeholders = ["what are you looking for ?", "iphone 16", "macbook pro"];
 
 export default function Navbar() {
+  const { itemCount, setIsCartOpen } = useCart();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -37,7 +39,7 @@ export default function Navbar() {
     if (!searchOpen) return;
     
     const currentString = placeholders[phIndex];
-    let typingSpeed = phIsDeleting ? 50 : 100;
+    const typingSpeed = phIsDeleting ? 50 : 100;
     
     if (!phIsDeleting && phCharIndex === currentString.length) {
       const timeout = setTimeout(() => setPhIsDeleting(true), 1500);
@@ -87,6 +89,7 @@ export default function Navbar() {
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
     if (searchQuery.trim().length < 1) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSearchResults([]);
       setIsSearching(false);
       return;
@@ -247,7 +250,7 @@ export default function Navbar() {
                           {/* Price */}
                           {price > 0 && (
                             <span className="text-sm font-semibold text-gray-900 flex-shrink-0">
-                              ${price.toLocaleString()}
+                              MAD ${Math.round(price).toLocaleString()}
                             </span>
                           )}
                         </button>
@@ -271,10 +274,18 @@ export default function Navbar() {
           </button>
 
           {/* Cart */}
-          <button className="p-2 text-gray-500 hover:text-gray-900 transition-colors relative">
+          <button 
+            className="p-2 text-gray-500 hover:text-gray-900 transition-colors relative cursor-pointer"
+            onClick={() => setIsCartOpen(true)}
+          >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007zM8.625 10.5a.375.375 0 11-.75 0 .375.375 0 01.75 0zm7.5 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
             </svg>
+            {itemCount > 0 && (
+              <span className="absolute top-0 right-0 inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-bold leading-none text-white transform translate-x-1/4 -translate-y-1/4 bg-blue-600 rounded-full">
+                {itemCount}
+              </span>
+            )}
           </button>
 
           {/* Mobile menu toggle */}
