@@ -10,6 +10,7 @@ const COLOR_MAP: Record<string, string> = {
   "Starlight": "#f0e4d3",
   "Silver": "#e3e4e5",
   "Skyblue": "#b0c4de",
+  "Sky Blue": "#b0c4de",
   "Space Black": "#2e2e2e",
   "Black": "#000000",
   "Titanium Gray": "#878681",
@@ -20,7 +21,39 @@ const COLOR_MAP: Record<string, string> = {
   "Ultramarine": "#120a8f",
   "White": "#ffffff",
   "Intense Blue": "#234e70",
-  "Orange": "#e37424"
+  "Blue Intense": "#234e70",
+  "Orange": "#e37424",
+  "Jade": "#8b9c90",
+  "Moonstone": "#e3e0d8",
+  "Titanium Black": "#3b3b3b",
+  "Titanium Gold": "#cfba9e",
+  "Titanium Silver Blue": "#8ea2b3",
+  "Titanium White Silver": "#e8e8e8",
+  "Violet": "#a89eb6",
+  "Cobalt Violet": "#483d8b",
+  "Pink Gold": "#f0dfdb",
+  "Navy": "#1a2238",
+  "Pink": "#f3d1d6",
+  "Silver Shadow": "#b2b6b9",
+  "Cloud White": "#f8f8f8",
+  "Light Gold": "#e8d8c8",
+  "Lavender": "#c9c2d6",
+  "Mist Blue": "#a8bccc",
+  "Sage": "#9ea996"
+};
+
+const getScaleClass = (brand?: string | null, categorySlug?: string | null) => {
+  if (categorySlug === 'laptops') {
+    if (brand?.toLowerCase() === 'apple') return 'scale-[1.35]'; 
+    return 'scale-[0.95]'; 
+  }
+  if (categorySlug === 'smartphones') {
+    if (brand?.toLowerCase() === 'google' || brand?.toLowerCase() === 'samsung') {
+      return 'scale-[1.6]';
+    }
+    return 'scale-100';
+  }
+  return 'scale-100';
 };
 
 export default function ProductDetailClient({ product }: { product: Product }) {
@@ -42,7 +75,7 @@ export default function ProductDetailClient({ product }: { product: Product }) {
 
   // Derive current exact variant or fallback
   const currentVariant = useMemo(() => {
-    return variants.find((v) => v.color === selectedColor && v.storage_gb === selectedStorage);
+    return variants.find((v) => v.color === selectedColor && (v.storage_gb ?? undefined) === selectedStorage);
   }, [variants, selectedColor, selectedStorage]);
 
   const fallbackVariant = currentVariant ?? variants.find(v => v.color === selectedColor) ?? variants[0];
@@ -50,6 +83,7 @@ export default function ProductDetailClient({ product }: { product: Product }) {
 
   const price = currentVariant ? parseFloat(currentVariant.price) : parseFloat(fallbackVariant.price);
   const inStock = currentVariant ? currentVariant.stock_quantity > 0 : false;
+  const stockLimit = currentVariant ? currentVariant.stock_quantity : fallbackVariant.stock_quantity;
   
   // Base variant for price diff logic
   const baseStorage = storageOptions.length > 0 ? [...storageOptions].sort((a,b)=>a-b)[0] : undefined;
@@ -69,12 +103,22 @@ export default function ProductDetailClient({ product }: { product: Product }) {
     
     // Switch image
     const colorTokens = color.toLowerCase().split(' ');
-    const idx = images.findIndex((img) => {
+    let bestIdx = -1;
+    let maxScore = -1;
+    images.forEach((img, idx) => {
       const urlDecoded = decodeURIComponent(img.url).toLowerCase();
-      return colorTokens.some(token => token.length >= 3 && urlDecoded.includes(token));
+      let score = 0;
+      if (urlDecoded.includes(color.toLowerCase())) score += 10;
+      colorTokens.forEach(token => {
+        if (token.length >= 3 && urlDecoded.includes(token)) score += 1;
+      });
+      if (score > maxScore) {
+        maxScore = score;
+        bestIdx = idx;
+      }
     });
-    if (idx !== -1) {
-      setSelectedImageIdx(idx);
+    if (bestIdx !== -1 && maxScore > 0) {
+      setSelectedImageIdx(bestIdx);
     }
   };
 
@@ -103,7 +147,7 @@ export default function ProductDetailClient({ product }: { product: Product }) {
                 src={images[selectedImageIdx].url}
                 alt={product.name}
                 fill
-                className="object-contain p-8"
+                className={`object-contain p-8 transition-transform ${getScaleClass(product.brand, product.category?.slug)}`}
                 sizes="(max-width: 768px) 100vw, 50vw"
                 priority
               />
@@ -142,7 +186,7 @@ export default function ProductDetailClient({ product }: { product: Product }) {
           <p className="text-gray-500 mt-4 leading-relaxed">{product.description}</p>
 
           {/* Color selector */}
-          {colors.length > 1 && (
+          {colors.length > 1 && product.category?.slug !== 'monitors' && (
             <div className="mt-6">
               <h4 className="text-xs font-semibold tracking-wider text-gray-500 uppercase mb-3">Color</h4>
               <div className="flex gap-2">
@@ -223,10 +267,10 @@ export default function ProductDetailClient({ product }: { product: Product }) {
               </button>
               <span className="px-4 py-2 text-sm font-medium min-w-[40px] text-center">{quantity}</span>
               <button
-                onClick={() => setQuantity(quantity + 1)}
-                disabled={!inStock}
+                onClick={() => setQuantity(Math.min(stockLimit, quantity + 1))}
+                disabled={!inStock || quantity >= stockLimit}
                 className={`px-3 py-2 transition-colors cursor-pointer ${
-                  !inStock
+                  !inStock || quantity >= stockLimit
                     ? "text-gray-300 cursor-not-allowed"
                     : "text-gray-500 hover:text-gray-900 hover:bg-gray-50"
                 }`}

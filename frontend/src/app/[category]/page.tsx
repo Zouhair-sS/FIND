@@ -41,7 +41,7 @@ export default async function CategoryPage({ params }: PageProps) {
       {products.length > 0 ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
           {products.map((product) => (
-            <ProductCard key={product.id} product={product} />
+            <ProductCard key={product.id} product={{ ...product, category: categoryData as any }} />
           ))}
         </div>
       ) : (

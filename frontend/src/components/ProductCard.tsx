@@ -10,6 +10,7 @@ const COLOR_MAP: Record<string, string> = {
   "Starlight": "#f0e4d3",
   "Silver": "#e3e4e5",
   "Skyblue": "#b0c4de",
+  "Sky Blue": "#b0c4de",
   "Space Black": "#2e2e2e",
   "Black": "#000000",
   "Titanium Gray": "#878681",
@@ -20,7 +21,39 @@ const COLOR_MAP: Record<string, string> = {
   "Ultramarine": "#120a8f",
   "White": "#ffffff",
   "Intense Blue": "#234e70",
-  "Orange": "#e37424"
+  "Blue Intense": "#234e70",
+  "Orange": "#e37424",
+  "Jade": "#8b9c90",
+  "Moonstone": "#e3e0d8",
+  "Titanium Black": "#3b3b3b",
+  "Titanium Gold": "#cfba9e",
+  "Titanium Silver Blue": "#8ea2b3",
+  "Titanium White Silver": "#e8e8e8",
+  "Violet": "#a89eb6",
+  "Cobalt Violet": "#483d8b",
+  "Pink Gold": "#f0dfdb",
+  "Navy": "#1a2238",
+  "Pink": "#f3d1d6",
+  "Silver Shadow": "#b2b6b9",
+  "Cloud White": "#f8f8f8",
+  "Light Gold": "#e8d8c8",
+  "Lavender": "#c9c2d6",
+  "Mist Blue": "#a8bccc",
+  "Sage": "#9ea996"
+};
+
+const getScaleClass = (brand?: string | null, categorySlug?: string | null) => {
+  if (categorySlug === 'laptops') {
+    if (brand?.toLowerCase() === 'apple') return 'scale-[1.35] group-hover:scale-[1.4]'; 
+    return 'scale-[0.95] group-hover:scale-100'; 
+  }
+  if (categorySlug === 'smartphones') {
+    if (brand?.toLowerCase() === 'google' || brand?.toLowerCase() === 'samsung') {
+      return 'scale-[1.6] group-hover:scale-[1.65]';
+    }
+    return 'scale-100 group-hover:scale-105';
+  }
+  return 'scale-100 group-hover:scale-105';
 };
 
 export default function ProductCard({ product }: { product: Product }) {
@@ -36,13 +69,22 @@ export default function ProductCard({ product }: { product: Product }) {
   let displayImageUrl = firstImage?.url;
   if (selectedColor && product.images) {
     const selectedTokens = selectedColor.toLowerCase().split(' ');
-    const matchingImage = product.images.find(img => {
-      const url = img.url.toLowerCase();
-      // Match if the URL contains the main word of the color (e.g. 'black', 'silver', 'midnight')
-      return selectedTokens.some(token => token.length >= 3 && url.includes(token));
+    let bestMatch = null;
+    let maxScore = -1;
+    product.images.forEach(img => {
+      const url = decodeURIComponent(img.url).toLowerCase();
+      let score = 0;
+      if (url.includes(selectedColor.toLowerCase())) score += 10;
+      selectedTokens.forEach(token => {
+        if (token.length >= 3 && url.includes(token)) score += 1;
+      });
+      if (score > maxScore) {
+        maxScore = score;
+        bestMatch = img;
+      }
     });
-    if (matchingImage) {
-      displayImageUrl = matchingImage.url;
+    if (bestMatch && maxScore > 0) {
+      displayImageUrl = (bestMatch as any).url;
     }
   }
 
@@ -56,7 +98,7 @@ export default function ProductCard({ product }: { product: Product }) {
               src={displayImageUrl}
               alt={product.name}
               fill
-              className="object-contain group-hover:scale-105 transition-transform duration-300"
+              className={`object-contain transition-transform duration-300 ${getScaleClass(product.brand, product.category?.slug)}`}
               sizes="(max-width: 768px) 50vw, 25vw"
             />
           ) : (
@@ -79,7 +121,7 @@ export default function ProductCard({ product }: { product: Product }) {
       </Link>
 
       {/* Color Swatches */}
-      {colors.length > 0 && (
+      {colors.length > 0 && product.category?.slug !== 'monitors' && (
         <div className="flex items-center gap-2 mt-3 pl-1">
           {colors.map((color) => {
             const hex = COLOR_MAP[color] || "#cccccc";
