@@ -7,6 +7,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Trash2, Check, ChevronDown, ChevronUp, Lock } from "lucide-react";
+import { formatPrice } from "@/lib/formatPrice";
 
 export default function CartPage() {
   const { enrichedItems, updateQuantity, removeItem, subtotal, isLoadingPrices, itemCount } = useCart();
@@ -140,7 +141,7 @@ export default function CartPage() {
                             {item.cachedTitle}
                           </Link>
                           <span className="text-xl font-semibold text-gray-900 whitespace-nowrap">
-                            {isLoadingPrices && item.price === null ? "..." : item.price !== null ? `MAD ${Math.round(item.price * item.quantity).toLocaleString()}` : "N/A"}
+                            {isLoadingPrices && item.price === null ? "..." : item.price !== null ? <>{formatPrice(item.price * item.quantity)} <span className="text-sm font-normal text-gray-400">MAD</span></> : "N/A"}
                           </span>
                         </div>
                         
@@ -214,19 +215,19 @@ export default function CartPage() {
             <div className="flex justify-between">
               <dt>Subtotal</dt>
               <dd className="font-medium text-gray-900">
-                {isLoadingPrices ? "..." : `MAD ${Math.round(subtotal).toLocaleString()}`}
+                {isLoadingPrices ? "..." : <>{formatPrice(subtotal)} <span className="text-xs text-gray-400">MAD</span></>}
               </dd>
             </div>
             <div className="flex justify-between">
               <dt>Estimated Shipping</dt>
               <dd className="font-medium text-gray-900">
-                {isLoadingPrices ? "..." : shipping === 0 ? "Free" : `MAD ${shipping.toLocaleString()}`}
+                {isLoadingPrices ? "..." : shipping === 0 ? "Free" : <>{formatPrice(shipping)} <span className="text-xs text-gray-400">MAD</span></>}
               </dd>
             </div>
             <div className="flex justify-between">
               <dt>Estimated Tax (20%)</dt>
               <dd className="font-medium text-gray-900">
-                {isLoadingPrices ? "..." : `MAD ${Math.round(tax).toLocaleString()}`}
+                {isLoadingPrices ? "..." : <>{formatPrice(tax)} <span className="text-xs text-gray-400">MAD</span></>}
               </dd>
             </div>
           </dl>
@@ -234,7 +235,7 @@ export default function CartPage() {
           <div className="flex justify-between items-center mb-8">
             <span className="text-xl font-bold text-gray-900">Total</span>
             <span className="text-3xl font-bold text-gray-900">
-              {isLoadingPrices ? "..." : `MAD ${Math.round(total).toLocaleString()}`}
+              {isLoadingPrices ? "..." : <>{formatPrice(total)} <span className="text-lg font-normal text-gray-400">MAD</span></>}
             </span>
           </div>
 

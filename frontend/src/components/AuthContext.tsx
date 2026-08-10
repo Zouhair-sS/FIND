@@ -53,8 +53,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
-    await axios.post("/api/logout");
-    setUser(null);
+    try {
+      await axios.post("/api/logout");
+    } catch (error) {
+      console.error("Logout failed on server, clearing local state");
+    } finally {
+      setUser(null);
+    }
   };
 
   const isAuthenticated = !!user;

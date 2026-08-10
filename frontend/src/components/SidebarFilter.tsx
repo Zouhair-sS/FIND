@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { FilterGroup } from "@/lib/api";
 import { ChevronDown, ChevronUp } from "lucide-react";
+import { formatPrice } from "@/lib/formatPrice";
 
 interface SidebarFilterProps {
   filters: FilterGroup[];
@@ -43,8 +44,8 @@ export default function SidebarFilter({
             className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-gray-900"
           />
           <div className="flex justify-between text-sm text-gray-500 mt-2">
-            <span>MAD {Math.round(priceRange.min).toLocaleString()}</span>
-            <span>MAD {Math.round(selectedMaxPrice).toLocaleString()}</span>
+            <span>{formatPrice(priceRange.min)} MAD</span>
+            <span>{formatPrice(selectedMaxPrice)} MAD</span>
           </div>
         </div>
       )}
@@ -61,15 +62,15 @@ export default function SidebarFilter({
       ))}
 
       {/* In Stock Only */}
-      <div className="mt-8 pt-6 border-t border-gray-100 flex items-center justify-between">
-        <span className="text-sm font-medium text-gray-900">In stock only</span>
+      <label className="mt-8 pt-6 border-t border-gray-100 flex items-center justify-between cursor-pointer group">
+        <span className="text-sm font-medium text-gray-900 group-hover:text-gray-700 transition-colors">In stock only</span>
         <input
           type="checkbox"
           checked={inStockOnly}
           onChange={(e) => onInStockChange(e.target.checked)}
-          className="w-4 h-4 text-gray-900 bg-gray-100 border-gray-300 rounded focus:ring-gray-900"
+          className="w-4 h-4 text-gray-900 bg-gray-100 border-gray-300 rounded focus:ring-gray-900 cursor-pointer"
         />
-      </div>
+      </label>
     </div>
   );
 }
@@ -117,19 +118,44 @@ function FilterSection({
             }
             if (filterGroup.slug === "screen_size") label += '"';
 
+            if (filterGroup.slug === "category") {
+              return (
+                <button
+                  key={option.value}
+                  onClick={() => onChange(option.value)}
+                  className="flex items-center justify-between w-full cursor-pointer group py-1.5"
+                >
+                  <div className="flex items-center">
+                    <svg 
+                      className="w-3.5 h-3.5 text-gray-400 group-hover:text-gray-900 transform group-hover:translate-x-1 transition-all duration-300 mr-2" 
+                      fill="none" 
+                      stroke="currentColor" 
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                    </svg>
+                    <span className="text-sm text-gray-700 group-hover:text-gray-900 transform group-hover:translate-x-1 transition-all duration-300">
+                      {label}
+                    </span>
+                  </div>
+                  <span className="text-xs text-gray-400 transition-colors duration-300">{option.count}</span>
+                </button>
+              );
+            }
+
             return (
               <label
                 key={option.value}
-                className="flex items-center justify-between cursor-pointer group"
+                className="flex items-center justify-between cursor-pointer group py-1"
               >
                 <div className="flex items-center">
                   <input
                     type="checkbox"
                     checked={isChecked}
                     onChange={() => onChange(option.value)}
-                    className="w-4 h-4 text-gray-900 bg-gray-100 border-gray-300 rounded focus:ring-gray-900"
+                    className="w-4 h-4 text-gray-900 bg-gray-100 border-gray-300 rounded focus:ring-gray-900 transition-all duration-200"
                   />
-                  <span className="ml-3 text-sm text-gray-700 group-hover:text-gray-900 transition-colors">
+                  <span className="ml-3 text-sm text-gray-700 group-hover:text-gray-900 transition-colors duration-200">
                     {label}
                   </span>
                 </div>

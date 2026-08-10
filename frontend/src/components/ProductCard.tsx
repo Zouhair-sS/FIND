@@ -1,9 +1,12 @@
 "use client";
 
+import { motion } from "framer-motion";
+
 import Link from "next/link";
 import Image from "next/image";
 import { useState } from "react";
 import type { Product } from "@/lib/api";
+import { formatPrice } from "@/lib/formatPrice";
 
 const COLOR_MAP: Record<string, string> = {
   "Midnight": "#1c1f24",
@@ -42,10 +45,38 @@ const COLOR_MAP: Record<string, string> = {
   "Sage": "#9ea996"
 };
 
+const BRAND_LOGOS: Record<string, string> = {
+  "Apple": "/images/LOGOS/Brands/apple logo.svg",
+  "Samsung": "/images/LOGOS/Brands/samsung.svg",
+  "Google": "/images/LOGOS/Brands/Google.svg",
+  "Lenovo": "/images/LOGOS/Brands/lenovo.svg",
+  "Dell": "/images/LOGOS/Brands/dell.svg",
+  "ASUS": "/images/LOGOS/Brands/Rog strix.png",
+};
+
+const PROCESSOR_BADGES: Record<string, string> = {
+  "M3": "/images/LOGOS/processors/apple m3.png",
+  "M3 Pro": "/images/LOGOS/processors/apple m3Pro.png",
+  "M3 Max 30-core": "/images/LOGOS/processors/apple m3 max.png",
+  "M3 Max (30-core GPU)": "/images/LOGOS/processors/apple m3 max.png",
+  "M3 Max (40-core GPU)": "/images/LOGOS/processors/apple m3 max.png",
+  "M3 Max 40-core": "/images/LOGOS/processors/apple m3 max.png",
+  "M4 Pro": "/images/LOGOS/processors/apple m4Pro.png",
+  "M4 Max 32-core": "/images/LOGOS/processors/apple m4 Max.png",
+  "M4 Max 40-core": "/images/LOGOS/processors/apple m4 Max.png",
+  "M5 Pro": "/images/LOGOS/processors/apple m5 Pro.png",
+  "M5 Max 32-core": "/images/LOGOS/processors/apple m5 max.png",
+  "M5 Max 40-core": "/images/LOGOS/processors/apple m5 max.png",
+  "Core Ultra 5": "/images/LOGOS/processors/Core Ultra 5.png",
+  "Core Ultra 7": "/images/LOGOS/processors/Core Ultra 7.png",
+  "Core i7": "/images/LOGOS/processors/core i7.png",
+  "Core i9": "/images/LOGOS/processors/core i9.webp",
+};
+
 const getScaleClass = (brand?: string | null, categorySlug?: string | null) => {
   if (categorySlug === 'laptops') {
-    if (brand?.toLowerCase() === 'apple') return 'scale-[1.35] group-hover:scale-[1.4]'; 
-    return 'scale-[0.95] group-hover:scale-100'; 
+    if (brand?.toLowerCase() === 'apple') return 'scale-[1.35] group-hover:scale-[1.4]';
+    return 'scale-[0.95] group-hover:scale-100';
   }
   if (categorySlug === 'smartphones') {
     if (brand?.toLowerCase() === 'google' || brand?.toLowerCase() === 'samsung') {
@@ -56,18 +87,17 @@ const getScaleClass = (brand?: string | null, categorySlug?: string | null) => {
   return 'scale-100 group-hover:scale-105';
 };
 
-export default function ProductCard({ 
-  product, 
+export default function ProductCard({
+  product,
   activeFilters = {},
   activeMaxPrice = Infinity
-}: { 
+}: {
   product: Product;
   activeFilters?: Record<string, (string | number)[]>;
   activeMaxPrice?: number;
 }) {
-  // Compute the cheapest matching variant
   const variantLevelSlugs = ["ram_gb", "storage_gb", "processor", "screen_size"];
-  
+
   const activeVariantFilters = Object.entries(activeFilters).filter(
     ([slug, values]) => variantLevelSlugs.includes(slug) && values.length > 0
   );
@@ -94,12 +124,27 @@ export default function ProductCard({
   }
 
   const price = bestPrice;
-  
-  // Extract unique colors
-  const colors = Array.from(new Set(product.variants?.map(v => v.color).filter(Boolean))) as string[];
-  const [selectedColor, setSelectedColor] = useState<string | null>(colors.length > 0 ? colors[0] : null);
 
-  // Find image for selected color
+  // Hash function for deterministic color selection
+  const hashString = (str: string) => {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) hash = (hash << 5) - hash + str.charCodeAt(i);
+    return Math.abs(hash);
+  };
+
+  const colors = Array.from(new Set(product.variants?.map(v => v.color).filter(Boolean))) as string[];
+  const activeColors = colors.filter(c => product.variants?.some(v => v.color === c && v.stock_quantity > 0));
+
+  // Calculate deterministic initial color based on product unique signature
+  const configVariant = product.variants?.[0];
+  const configString = `${product.brand?.name}-${product.name}-${configVariant?.processor}-${configVariant?.ram_gb}-${configVariant?.storage_gb}`;
+
+  const initialColor = activeColors.length > 0
+    ? activeColors[hashString(configString) % activeColors.length]
+    : (colors[0] || null);
+
+  const [selectedColor, setSelectedColor] = useState<string | null>(initialColor);
+
   let displayImageUrl = product.images?.[0]?.url;
   if (selectedColor && product.images) {
     const selectedTokens = selectedColor.toLowerCase().split(' ');
@@ -122,17 +167,43 @@ export default function ProductCard({
     }
   }
 
+  // Get Brand Logo
+  const brandLogo = product.brand?.name ? BRAND_LOGOS[product.brand.name] : null;
+  // Get Processor Badge
+  const processor = product.variants?.[0]?.processor;
+  const processorBadge = processor ? PROCESSOR_BADGES[processor] : null;
+
   return (
-    <div className="group block mb-6">
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-50px" }}
+      transition={{ duration: 0.5, ease: "easeOut" }}
+      className="group block mb-6"
+    >
       <Link href={`/product/${product.slug}`} className="block">
-        {/* Image */}
-        <div className="relative aspect-square mb-4 flex items-center justify-center overflow-hidden rounded-2xl">
+        {/* Image Container */}
+        <div className="relative aspect-square mb-4 flex items-center justify-center overflow-hidden rounded-3xl bg-white border border-gray-100 shadow-sm hover:shadow-lg transition-all duration-300">
+
+          {/* Top Left Area - Brand Logo & Badge */}
+          <div className="absolute top-4 left-4 z-10 flex items-center gap-2 opacity-80 mix-blend-multiply">
+            {brandLogo && (
+              <div className={`relative w-7 h-7 ${
+                product.brand?.name?.toLowerCase() === 'apple' ? 'scale-[0.7]' : 
+                product.brand?.name?.toLowerCase() === 'dell' ? 'scale-[0.8]' : 'scale-90'
+              }`}>
+                <Image src={brandLogo} alt={product.brand?.name || 'Brand logo'} fill className="object-contain" />
+              </div>
+            )}
+          </div>
+
+          {/* Product Image */}
           {displayImageUrl ? (
             <Image
               src={displayImageUrl}
               alt={product.name}
               fill
-              className={`object-contain p-4 transition-transform duration-300 ${getScaleClass(product.brand?.name, product.category?.slug)}`}
+              className={`object-contain p-8 transition-transform duration-300 ${getScaleClass(product.brand?.name, product.category?.slug)}`}
               sizes="(max-width: 768px) 50vw, 25vw"
             />
           ) : (
@@ -142,6 +213,23 @@ export default function ProductCard({
               </svg>
             </div>
           )}
+
+          {/* Processor Badge - Bottom Right */}
+          {processorBadge && (
+            <div className="absolute bottom-3 right-3 z-10 w-9 h-9 pointer-events-none">
+              <Image 
+                src={processorBadge} 
+                alt={processor || 'Processor badge'} 
+                fill 
+                className={`object-contain rounded drop-shadow-sm ${
+                  processor?.toLowerCase().includes('m5') ? 'scale-[1.8]' :
+                  processor?.toLowerCase().includes('m4') ? 'scale-[1.15]' :
+                  processor?.toLowerCase().includes('m3') ? 'scale-[1.15]' :
+                  'scale-[0.85]'
+                }`} 
+              />
+            </div>
+          )}
         </div>
 
         {/* Info */}
@@ -149,8 +237,24 @@ export default function ProductCard({
           {product.name}
         </h3>
 
-        <p className="text-sm text-gray-500 mt-1">
-          {price > 0 ? `MAD ${Math.round(price).toLocaleString()}` : "Price unavailable"}
+        {(() => {
+          const v = product.variants?.[0];
+          const configParts = [];
+          if (v?.ram_gb) configParts.push(`${v.ram_gb}GB`);
+          if (v?.storage_gb) {
+            configParts.push(v.storage_gb >= 1024 ? `${v.storage_gb / 1024}TB` : `${v.storage_gb}GB`);
+          }
+          if (configParts.length === 0) return null;
+          return <p className="text-xs text-gray-500 mt-1">{configParts.join(' · ')}</p>;
+        })()}
+
+        <p className="text-sm font-bold text-gray-900 mt-1">
+          {price > 0 ? (
+            <>
+              {formatPrice(price)}{' '}
+              <span className="text-xs text-gray-400 font-normal">MAD</span>
+            </>
+          ) : "Price unavailable"}
         </p>
       </Link>
 
@@ -167,9 +271,8 @@ export default function ProductCard({
                   e.preventDefault();
                   setSelectedColor(color);
                 }}
-                className={`w-4 h-4 rounded-full flex items-center justify-center transition-all cursor-pointer ${
-                  isSelected ? "ring-2 ring-offset-2 ring-gray-900 scale-110" : "hover:scale-110 opacity-70 hover:opacity-100"
-                }`}
+                className={`w-4 h-4 rounded-full flex items-center justify-center transition-all cursor-pointer ${isSelected ? "ring-2 ring-offset-2 ring-primary scale-110" : "hover:scale-110 opacity-70 hover:opacity-100"
+                  }`}
                 title={color}
               >
                 <span
@@ -181,6 +284,6 @@ export default function ProductCard({
           })}
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }

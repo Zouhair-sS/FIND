@@ -19,5 +19,7 @@ Route::get('/categories', [CategoryController::class, 'index']);
 Route::get('/categories/{slug}', [CategoryController::class, 'show']);
 
 Route::get('/products/search', [ProductController::class, 'search']);
+Route::get('/products/all-with-filters', [ProductController::class, 'allWithFilters']);
 Route::get('/products', [ProductController::class, 'index']);
+Route::get('/products/{slug}/configurations', [ProductController::class, 'configurations']);
 Route::get('/products/{slug}', [ProductController::class, 'show']);

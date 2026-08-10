@@ -5,6 +5,8 @@ import { Category } from "@/lib/api";
 import ProductCard from "./ProductCard";
 import SidebarFilter from "./SidebarFilter";
 import { X } from "lucide-react";
+import { formatPrice } from "@/lib/formatPrice";
+import { useRouter } from "next/navigation";
 
 const variantLevelSlugs = ["ram_gb", "storage_gb", "processor", "screen_size"];
 
@@ -12,12 +14,18 @@ export default function CategoryClient({ category }: { category: Category }) {
   const products = category.products ?? [];
   const filtersDef = category.filters ?? [];
   const priceRange = category.price ?? { min: 0, max: 0 };
+  const router = useRouter();
 
   const [selectedFilters, setSelectedFilters] = useState<Record<string, (string | number)[]>>({});
   const [selectedMaxPrice, setSelectedMaxPrice] = useState<number>(priceRange.max);
   const [inStockOnly, setInStockOnly] = useState<boolean>(false);
 
   const handleFilterChange = (slug: string, value: string | number) => {
+    if (slug === "category") {
+      router.push(`/${String(value).toLowerCase()}`);
+      return;
+    }
+
     setSelectedFilters((prev) => {
       const current = prev[slug] || [];
       if (current.includes(value)) {
@@ -50,6 +58,8 @@ export default function CategoryClient({ category }: { category: Category }) {
 
         if (slug === "brand") {
           if (!product.brand || !values.includes(product.brand.name)) return false;
+        } else if (slug === "category") {
+          if (!product.category || !values.includes(product.category.name)) return false;
         } else {
           // Custom attribute like 'os' or 'usage'
           const hasAttr = product.attribute_values?.some(
@@ -148,7 +158,7 @@ export default function CategoryClient({ category }: { category: Category }) {
                 onClick={() => setSelectedMaxPrice(priceRange.max)}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm rounded-full transition-colors"
               >
-                ≤ MAD {Math.round(selectedMaxPrice).toLocaleString()}
+                ≤ {formatPrice(selectedMaxPrice)} MAD
                 <X className="w-3 h-3 text-gray-500" />
               </button>
             )}
@@ -173,16 +183,16 @@ export default function CategoryClient({ category }: { category: Category }) {
         )}
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-10 overflow-hidden">
+      <div className="flex flex-col lg:flex-row gap-10">
         {/* Sidebar */}
         <div 
           className={`transition-all duration-500 ease-in-out origin-left flex-shrink-0 ${
             isSidebarOpen 
-              ? "w-full lg:w-64 opacity-100 translate-x-0" 
+              ? "w-full lg:w-56 opacity-100 translate-x-0" 
               : "w-0 opacity-0 -translate-x-full overflow-hidden absolute lg:static"
           }`}
         >
-          <div className="w-full lg:w-64">
+          <div className="w-full lg:w-56 sticky top-24 max-h-[calc(100vh-120px)] overflow-y-auto overflow-x-hidden pr-4 pb-8 custom-scrollbar">
             <SidebarFilter
               filters={filtersDef}
               priceRange={priceRange}
@@ -203,7 +213,7 @@ export default function CategoryClient({ category }: { category: Category }) {
               {filteredProducts.map((product) => (
                 <ProductCard 
                   key={product.id} 
-                  product={{ ...product, category: category }} 
+                  product={{ ...product, category: product.category || category }} 
                   activeFilters={selectedFilters}
                   activeMaxPrice={selectedMaxPrice}
                 />

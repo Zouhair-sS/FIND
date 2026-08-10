@@ -138,3 +138,9 @@ export async function searchProducts(query: string): Promise<Product[]> {
   if (!res.ok) throw new Error("Failed to search products");
   return res.json();
 }
+
+export async function fetchAllProductsWithFilters(): Promise<Category & { products: Product[] }> {
+  const res = await fetch(`${API_BASE}/products/all-with-filters`, { next: { revalidate: 60 } });
+  if (!res.ok) throw new Error("Failed to fetch all products");
+  return res.json();
+}

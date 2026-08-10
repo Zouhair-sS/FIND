@@ -29,6 +29,7 @@ class CategoryController extends Controller
 
         $products = \App\Models\Product::with(['variants', 'images', 'brand', 'series', 'attributeValues.attribute', 'collections'])
             ->whereIn('category_id', $categoryIds)
+            ->inRandomOrder()
             ->get();
             
         $brands = [];

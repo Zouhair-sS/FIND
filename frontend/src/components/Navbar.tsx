@@ -8,10 +8,12 @@ import { motion } from "framer-motion";
 import type { Product } from "@/lib/api";
 import { useCart } from "./CartContext";
 import { useAuth } from "@/components/AuthContext";
+import { formatPrice } from "@/lib/formatPrice";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api";
 
 const NAV_LINKS = [
+  { label: "All Products", href: "/products" },
   { label: "Laptops", href: "/laptops" },
   { label: "Smartphones", href: "/smartphones" },
   { label: "Monitors", href: "/monitors" },
@@ -176,9 +178,9 @@ export default function Navbar() {
           <div ref={searchRef} className="relative hidden sm:flex items-center justify-end h-10" onKeyDown={handleKeyDown}>
             {/* Search trigger / input */}
             <div 
-              className={`flex items-center gap-2 border transition-all duration-300 ease-out overflow-hidden ${
+              className={`flex items-center transition-all duration-300 overflow-hidden ${
                 searchOpen 
-                  ? 'w-[300px] px-4 py-2 rounded-full border-blue-300 bg-white shadow-sm cursor-text' 
+                  ? 'w-[300px] px-4 py-2 rounded-full border-primary/30 bg-gray-50 focus-within:bg-white focus-within:border-primary shadow-sm cursor-text' 
                   : 'w-10 h-10 rounded-full border-transparent bg-transparent hover:bg-gray-100 cursor-pointer justify-center'
               }`}
               onClick={() => {
@@ -211,13 +213,13 @@ export default function Navbar() {
               )}
             </div>
 
-            {/* Search results dropdown */}
-            {searchOpen && (searchResults.length > 0 || isSearching || searchQuery.trim().length > 0) && (
-              <div className="absolute top-full right-0 mt-2 w-[380px] bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden z-[60]">
+            {/* Desktop Search Results Dropdown */}
+            {searchOpen && (searchQuery.trim().length > 0 || isSearching) && (
+              <div className="absolute top-full right-0 mt-3 w-[400px] bg-white rounded-3xl shadow-2xl shadow-primary/5 border border-gray-100 overflow-hidden z-[60]">
                 {isSearching ? (
-                  <div className="p-6 text-center">
-                    <div className="inline-block w-5 h-5 border-2 border-gray-200 border-t-blue-500 rounded-full animate-spin" />
-                    <p className="text-sm text-gray-400 mt-2">Searching...</p>
+                  <div className="p-8 text-center text-gray-500 flex flex-col items-center gap-3">
+                    <div className="inline-block w-6 h-6 border-2 border-gray-200 border-t-primary rounded-full animate-spin" />
+                    <span className="text-sm">Searching...</span>
                   </div>
                 ) : searchResults.length > 0 ? (
                   <div className="max-h-[400px] overflow-y-auto">
@@ -260,7 +262,7 @@ export default function Navbar() {
                           {/* Price */}
                           {price > 0 && (
                             <span className="text-sm font-semibold text-gray-900 flex-shrink-0">
-                              MAD ${Math.round(price).toLocaleString()}
+                              {formatPrice(price)} <span className="text-xs font-normal text-gray-400">MAD</span>
                             </span>
                           )}
                         </button>
@@ -291,30 +293,34 @@ export default function Navbar() {
             </button>
 
             {userMenuOpen && (
-              <div className="absolute top-full right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-[60]">
+              <div className="absolute top-full right-0 mt-3 w-48 bg-white rounded-2xl shadow-xl shadow-primary/5 border border-gray-100 py-2 z-[60]">
                 {isAuthenticated ? (
                   <>
-                    <div className="px-4 py-2 border-b border-gray-50 mb-2">
+                    <div className="px-4 py-3 border-b border-gray-100 mb-1">
                       <p className="text-sm font-medium text-gray-900">{user?.name}</p>
                       <p className="text-xs text-gray-500 truncate">{user?.email}</p>
                     </div>
-                    <Link href="/orders" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Orders</Link>
-                    <Link href="/profile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Profile</Link>
-                    <Link href="/addresses" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Addresses</Link>
+                    <Link href="/profile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-primary">
+                      My Profile
+                    </Link>
+                    <Link href="/orders" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-primary">
+                      Order History
+                    </Link>
                     <button 
-                      onClick={() => {
-                        logout();
-                        setUserMenuOpen(false);
-                      }}
-                      className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 mt-2 border-t border-gray-50 cursor-pointer"
+                      onClick={() => { logout(); setUserMenuOpen(false); }}
+                      className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
                     >
-                      Logout
+                      Sign Out
                     </button>
                   </>
                 ) : (
                   <>
-                    <Link href="/login" onClick={() => setUserMenuOpen(false)} className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Sign In</Link>
-                    <Link href="/register" onClick={() => setUserMenuOpen(false)} className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Create Account</Link>
+                    <Link href="/login" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-primary">
+                      Sign In
+                    </Link>
+                    <Link href="/register" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-primary">
+                      Create Account
+                    </Link>
                   </>
                 )}
               </div>
@@ -323,22 +329,16 @@ export default function Navbar() {
 
           {/* Cart */}
           <button 
-            className="p-2 text-gray-500 hover:text-gray-900 transition-colors relative cursor-pointer"
             onClick={() => setIsCartOpen(true)}
+            className="p-2 text-gray-500 hover:text-gray-900 transition-colors relative cursor-pointer"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007zM8.625 10.5a.375.375 0 11-.75 0 .375.375 0 01.75 0zm7.5 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
             </svg>
             {itemCount > 0 && (
-              <motion.span 
-                key={itemCount}
-                initial={{ scale: 0.5, opacity: 0 }}
-                animate={{ scale: [1, 1.3, 1], opacity: 1 }}
-                transition={{ duration: 0.3, ease: "easeInOut" }}
-                className="absolute top-0 right-0 inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-bold leading-none text-white transform translate-x-1/4 -translate-y-1/4 bg-blue-600 rounded-full"
-              >
+              <span className="absolute top-0 right-0 inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-bold leading-none text-white transform translate-x-1/4 -translate-y-1/4 bg-primary rounded-full">
                 {itemCount}
-              </motion.span>
+              </span>
             )}
           </button>
 

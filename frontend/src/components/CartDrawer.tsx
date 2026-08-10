@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Trash2 } from "lucide-react";
+import { formatPrice } from "@/lib/formatPrice";
 
 export default function CartDrawer() {
   const { isCartOpen, setIsCartOpen, enrichedItems, updateQuantity, removeItem, subtotal, isLoadingPrices } = useCart();
@@ -163,7 +164,7 @@ export default function CartDrawer() {
                                   {isLoadingPrices && item.price === null ? (
                                     <span className="text-gray-300">...</span>
                                   ) : item.price !== null ? (
-                                    `MAD ${Math.round(item.price * item.quantity).toLocaleString()}`
+                                    <>{formatPrice(item.price * item.quantity)} <span className="text-xs font-normal text-gray-400">MAD</span></>
                                   ) : (
                                     <span className="text-red-500 text-xs">Unavailable</span>
                                   )}
@@ -203,7 +204,7 @@ export default function CartDrawer() {
                 <div className="flex justify-between items-center mb-6">
                   <span className="text-base font-medium text-gray-600">Subtotal</span>
                   <span className="text-xl font-bold text-gray-900">
-                    {isLoadingPrices ? "..." : `MAD ${Math.round(subtotal).toLocaleString()}`}
+                    {isLoadingPrices ? "..." : <>{formatPrice(subtotal)} <span className="text-sm font-normal text-gray-400">MAD</span></>}
                   </span>
                 </div>
 

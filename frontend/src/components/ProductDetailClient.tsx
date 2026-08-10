@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useMemo, useState, useEffect } from "react";
 import type { Product } from "@/lib/api";
 import { useCart } from "./CartContext";
+import { formatPrice } from "@/lib/formatPrice";
 
 const COLOR_MAP: Record<string, string> = {
   "Midnight": "#1c1f24",
@@ -57,6 +58,16 @@ const getScaleClass = (brand?: string | null, categorySlug?: string | null) => {
   return 'scale-100';
 };
 
+interface RelatedConfig {
+  id: number;
+  slug: string;
+  name: string;
+  processor: string | null;
+  ram_gb: number | null;
+  storage_gb: number | null;
+  price: number;
+}
+
 export default function ProductDetailClient({ product }: { product: Product }) {
   const { addItem, items, setIsCartOpen } = useCart();
   const variants = useMemo(() => product.variants ?? [], [product.variants]);
@@ -64,94 +75,43 @@ export default function ProductDetailClient({ product }: { product: Product }) {
 
   // Unique colors
   const colors = [...new Set(variants.map((v) => v.color).filter(Boolean))] as string[];
-  // Unique storage options
-  const storageOptions = [...new Set(variants.map((v) => v.storage_gb).filter(Boolean))] as number[];
-
-  const processorOptions = useMemo(() => [...new Set(variants.map((v) => v.processor).filter(Boolean))] as string[], [variants]);
   
   const [selectedColor, setSelectedColor] = useState<string>(colors[0] ?? "");
-  const [selectedProcessor, setSelectedProcessor] = useState<string | null | undefined>(
-    processorOptions.length > 0 ? processorOptions[0] : undefined
-  );
-  
-  const availableRams = useMemo(() => {
-    const valid = variants.filter(v => v.processor === selectedProcessor || !selectedProcessor);
-    return [...new Set(valid.map(v => v.ram_gb).filter(Boolean))].sort((a,b)=>(a as number)-(b as number)) as number[];
-  }, [variants, selectedProcessor]);
-
-  const [selectedRam, setSelectedRam] = useState<number | null | undefined>(
-    availableRams.length > 0 ? availableRams[0] : undefined
-  );
-
-  const availableStorages = useMemo(() => {
-    const valid = variants.filter(v => (v.processor === selectedProcessor || !selectedProcessor) && (v.ram_gb === selectedRam || !selectedRam));
-    return [...new Set(valid.map(v => v.storage_gb).filter(Boolean))].sort((a,b)=>(a as number)-(b as number)) as number[];
-  }, [variants, selectedProcessor, selectedRam]);
-
-  const [selectedStorage, setSelectedStorage] = useState<number | null | undefined>(
-    storageOptions.length > 0 ? [...storageOptions].sort((a,b)=>(a as number)-(b as number))[0] : undefined
-  );
-
-  // Auto update ram and storage when processor changes
-  useEffect(() => {
-    if (availableRams.length > 0 && selectedRam !== undefined && !availableRams.includes(selectedRam as number)) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setSelectedRam(availableRams[0]);
-    }
-  }, [availableRams, selectedRam]);
-
-  useEffect(() => {
-    if (availableStorages.length > 0 && selectedStorage !== undefined && !availableStorages.includes(selectedStorage as number)) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setSelectedStorage(availableStorages[0]);
-    }
-  }, [availableStorages, selectedStorage]);
-
-
   const [selectedImageIdx, setSelectedImageIdx] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const [addedToCart, setAddedToCart] = useState(false);
+  const [relatedConfigs, setRelatedConfigs] = useState<RelatedConfig[]>([]);
+
+  useEffect(() => {
+    fetch(`/api/products/${product.slug}/configurations`)
+      .then(res => res.json())
+      .then(data => setRelatedConfigs(data))
+      .catch(console.error);
+  }, [product.slug]);
 
   // Derive current exact variant or fallback
   const currentVariant = useMemo(() => {
-    return variants.find((v) => 
-      v.color === selectedColor && 
-      (v.storage_gb ?? undefined) === selectedStorage &&
-      (v.processor ?? undefined) === selectedProcessor &&
-      (v.ram_gb ?? undefined) === selectedRam
-    );
-  }, [variants, selectedColor, selectedStorage, selectedProcessor, selectedRam]);
+    return variants.find((v) => v.color === selectedColor) ?? variants[0];
+  }, [variants, selectedColor]);
 
-  const fallbackVariant = currentVariant ?? variants.find(v => v.color === selectedColor) ?? variants[0];
-  if (!fallbackVariant) return null;
+  if (!currentVariant) return null;
 
-  const price = currentVariant ? parseFloat(currentVariant.price) : parseFloat(fallbackVariant.price);
+  const price = parseFloat(currentVariant.price);
   
-  const activeVariantId = currentVariant?.id ?? fallbackVariant.id;
+  const activeVariantId = currentVariant.id;
   const cartItem = items.find((i) => i.variantId === activeVariantId);
   const quantityInCart = cartItem ? cartItem.quantity : 0;
   
-  const totalStock = currentVariant ? currentVariant.stock_quantity : fallbackVariant.stock_quantity;
+  const totalStock = currentVariant.stock_quantity;
   const availableStock = Math.max(0, totalStock - quantityInCart);
   
-  const inStock = currentVariant ? availableStock > 0 : false;
+  const inStock = availableStock > 0;
   const stockLimit = availableStock;
-  
-  // Base variant for price diff logic (find cheapest variant for this color and processor and ram)
-  const baseStorage = availableStorages.length > 0 ? availableStorages[0] : undefined;
-  const baseVariant = variants.find(v => v.color === selectedColor && v.storage_gb === baseStorage && v.processor === selectedProcessor && v.ram_gb === selectedRam) ?? fallbackVariant;
-  const basePrice = parseFloat(baseVariant.price);
 
   const formatStorage = (gb: number) => (gb >= 1024 ? `${gb / 1024}TB` : `${gb}GB`);
 
   const handleColorChange = (color: string) => {
     setSelectedColor(color);
-    // Auto-select storage if current storage is not available in new color
-    const hasCurrentStorage = variants.some(v => v.color === color && v.storage_gb === selectedStorage && v.processor === selectedProcessor && v.ram_gb === selectedRam);
-    if (!hasCurrentStorage) {
-      const availableStorage = variants.find(v => v.color === color && v.processor === selectedProcessor && v.ram_gb === selectedRam)?.storage_gb;
-      if (availableStorage !== undefined) setSelectedStorage(availableStorage);
-    }
     
     // Switch image
     const colorTokens = color.toLowerCase().split(' ');
@@ -175,19 +135,16 @@ export default function ProductDetailClient({ product }: { product: Product }) {
   };
 
   const handleAddToCart = () => {
-    const variantToUse = currentVariant ?? fallbackVariant;
-    if (!variantToUse) return;
-
     const attrs = [];
     if (selectedColor) attrs.push(selectedColor);
-    if (selectedProcessor) attrs.push(selectedProcessor);
-    if (selectedRam) attrs.push(`${selectedRam}GB RAM`);
-    if (selectedStorage) attrs.push(formatStorage(selectedStorage));
+    if (currentVariant.processor) attrs.push(currentVariant.processor);
+    if (currentVariant.ram_gb) attrs.push(`${currentVariant.ram_gb}GB RAM`);
+    if (currentVariant.storage_gb) attrs.push(formatStorage(currentVariant.storage_gb));
 
     addItem({
       productId: product.id,
       productSlug: product.slug,
-      variantId: variantToUse.id,
+      variantId: currentVariant.id,
       quantity,
       cachedTitle: product.name,
       cachedImage: images[selectedImageIdx]?.url,
@@ -197,12 +154,17 @@ export default function ProductDetailClient({ product }: { product: Product }) {
     setQuantity(1);
     setAddedToCart(true);
     
-    // Open drawer after a short delay to allow the "Added" animation to show
+    // Open drawer after a short delay
     setTimeout(() => {
       setIsCartOpen(true);
       setAddedToCart(false);
     }, 600);
   };
+
+  const configParts = [];
+  if (currentVariant.ram_gb) configParts.push(`${currentVariant.ram_gb}GB`);
+  if (currentVariant.storage_gb) configParts.push(formatStorage(currentVariant.storage_gb));
+  const configText = configParts.length > 0 ? configParts.join(' · ') : null;
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-10">
@@ -244,7 +206,7 @@ export default function ProductDetailClient({ product }: { product: Product }) {
                 <button
                   key={img.id}
                   onClick={() => setSelectedImageIdx(idx)}
-                  className={`relative w-16 h-16 rounded-lg overflow-hidden border-2 transition-colors ${
+                  className={`relative w-16 h-16 rounded-lg overflow-hidden border-2 transition-colors cursor-pointer ${
                     idx === selectedImageIdx ? "border-gray-900" : "border-gray-100 hover:border-gray-300"
                   }`}
                 >
@@ -258,119 +220,77 @@ export default function ProductDetailClient({ product }: { product: Product }) {
         {/* ── Right: Details ────────────────────────────────── */}
         <div>
           <h1 className="text-3xl font-bold text-gray-900">{product.name}</h1>
-          <p className="text-2xl font-semibold text-gray-900 mt-2">MAD {Math.round(price).toLocaleString()}</p>
+          {configText && <p className="text-lg text-gray-500 mt-1">{configText}</p>}
+          
+          <p className="text-2xl font-semibold text-gray-900 mt-4">
+            {formatPrice(price)}{' '}
+            <span className="text-base font-normal text-gray-400 tracking-wide">MAD</span>
+          </p>
 
           <p className="text-gray-500 mt-4 leading-relaxed">{product.description}</p>
 
+          {/* Available Configurations */}
+          {relatedConfigs.length > 0 && (
+             <div className="mt-8">
+               <h4 className="text-sm font-semibold tracking-wider text-gray-900 uppercase mb-4">Choose your configuration</h4>
+               <div className="flex flex-col gap-2">
+                 
+                 {/* Current Config */}
+                 <div className="flex justify-between items-center px-4 py-3 border-2 border-gray-900 bg-gray-50 rounded-lg">
+                   <div>
+                     <p className="text-sm font-semibold text-gray-900">{configText || "Base Configuration"}</p>
+                   </div>
+                   <p className="text-sm font-bold text-gray-900">{formatPrice(price)} MAD</p>
+                 </div>
+
+                 {/* Related Configs */}
+                 {relatedConfigs.map(c => {
+                   const cParts = [];
+                   if (c.ram_gb) cParts.push(`${c.ram_gb}GB`);
+                   if (c.storage_gb) cParts.push(formatStorage(c.storage_gb));
+                   const cText = cParts.length > 0 ? cParts.join(' · ') : c.processor || "Configuration";
+                   return (
+                     <Link key={c.id} href={`/product/${c.slug}`} className="flex justify-between items-center px-4 py-3 border border-gray-200 hover:border-gray-400 rounded-lg transition-colors group cursor-pointer">
+                       <div>
+                         <p className="text-sm font-medium text-gray-600 group-hover:text-gray-900 transition-colors">{cText}</p>
+                       </div>
+                       <p className="text-sm font-medium text-gray-600 group-hover:text-gray-900 transition-colors">{formatPrice(c.price)} MAD</p>
+                     </Link>
+                   )
+                 })}
+               </div>
+             </div>
+          )}
+
           {/* Color selector */}
-          {colors.length > 1 && product.category?.slug !== 'monitors' && (
-            <div className="mt-6">
+          {colors.length > 0 && product.category?.slug !== 'monitors' && (
+            <div className="mt-8">
               <h4 className="text-xs font-semibold tracking-wider text-gray-500 uppercase mb-3">Color</h4>
-              <div className="flex gap-2">
+              <div className="flex flex-col gap-2">
                 {colors.map((color) => {
                   const hex = COLOR_MAP[color] || "#cccccc";
                   const isSelected = selectedColor === color;
+                  
+                  // Find if this color is in stock
+                  const colorVariant = variants.find(v => v.color === color);
+                  const isColorInStock = colorVariant ? colorVariant.stock_quantity > 0 : false;
+
                   return (
                     <button
                       key={color}
                       onClick={() => handleColorChange(color)}
-                      className={`w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer ${
-                        isSelected ? "ring-2 ring-offset-2 ring-gray-900 scale-110" : "hover:scale-110 opacity-70 hover:opacity-100"
+                      className={`flex items-center gap-3 w-full text-left p-3 rounded-lg border transition-all cursor-pointer ${
+                        isSelected ? "border-gray-900 bg-gray-50" : "border-transparent hover:bg-gray-50"
                       }`}
-                      title={color}
                     >
                       <span
-                        className="w-full h-full rounded-full border border-gray-200"
+                        className="w-5 h-5 rounded-full border border-gray-200 flex-shrink-0"
                         style={{ backgroundColor: hex }}
                       />
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Processor selector */}
-          {processorOptions.length > 1 && (
-            <div className="mt-6">
-              <h4 className="text-xs font-semibold tracking-wider text-gray-500 uppercase mb-3">Processor</h4>
-              <div className="flex flex-wrap gap-2">
-                {processorOptions.map((proc) => {
-                  const isSelected = selectedProcessor === proc;
-                  return (
-                    <button
-                      key={proc}
-                      onClick={() => setSelectedProcessor(proc)}
-                      className={`px-4 py-2 text-sm rounded-lg border transition-all duration-200 ${
-                        isSelected
-                          ? "border-gray-900 text-gray-900 bg-gray-50 shadow-sm"
-                          : "border-gray-200 text-gray-600 hover:border-gray-400 hover:bg-gray-50 cursor-pointer"
-                      }`}
-                    >
-                      <span className="font-medium">{proc}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* RAM selector */}
-          {availableRams.length > 1 && (
-            <div className="mt-6">
-              <h4 className="text-xs font-semibold tracking-wider text-gray-500 uppercase mb-3">Memory</h4>
-              <div className="flex gap-2">
-                {availableRams.map((ram) => {
-                  const isSelected = selectedRam === ram;
-                  return (
-                    <button
-                      key={ram}
-                      onClick={() => setSelectedRam(ram)}
-                      className={`px-4 py-2 text-sm rounded-lg border transition-all duration-200 ${
-                        isSelected
-                          ? "border-gray-900 text-gray-900 bg-gray-50 shadow-sm"
-                          : "border-gray-200 text-gray-600 hover:border-gray-400 hover:bg-gray-50 cursor-pointer"
-                      }`}
-                    >
-                      <span className="font-medium">{ram}GB</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Storage selector */}
-          {availableStorages.length > 1 && (
-            <div className="mt-6">
-              <h4 className="text-xs font-semibold tracking-wider text-gray-500 uppercase mb-3">Configuration</h4>
-              <div className="flex gap-2">
-                {[...availableStorages].sort((a, b) => a - b).map((gb) => {
-                  const isSelected = selectedStorage === gb;
-                  const matchVariant = variants.find(
-                    (v) => v.storage_gb === gb && v.color === selectedColor && v.processor === selectedProcessor && v.ram_gb === selectedRam
-                  );
-                  const priceDiff = matchVariant ? parseFloat(matchVariant.price) - basePrice : 0;
-                  const isAvailable = !!matchVariant;
-
-                  return (
-                    <button
-                      key={gb}
-                      disabled={!isAvailable}
-                      onClick={() => setSelectedStorage(gb)}
-                      className={`px-4 py-2 text-sm rounded-lg border transition-all duration-200 ${
-                        !isAvailable ? "opacity-50 cursor-not-allowed bg-gray-50 border-gray-100" :
-                        isSelected
-                          ? "border-gray-900 text-gray-900 bg-gray-50 shadow-sm"
-                          : "border-gray-200 text-gray-600 hover:border-gray-400 hover:bg-gray-50 cursor-pointer"
-                      }`}
-                    >
-                      <span className="font-medium">{formatStorage(gb)}</span>
-                      {isAvailable && priceDiff > 0 && (
-                        <span className="block text-xs text-gray-500">+MAD {priceDiff}</span>
+                      <span className={`font-medium ${isSelected ? 'text-gray-900' : 'text-gray-600'}`}>{color}</span>
+                      {!isColorInStock && (
+                        <span className="ml-auto text-xs font-semibold text-gray-400 uppercase">Out of stock</span>
                       )}
-                      {isAvailable && priceDiff === 0 && <span className="block text-xs text-gray-400">base</span>}
-                      {!isAvailable && <span className="block text-xs text-gray-400">N/A</span>}
                     </button>
                   );
                 })}
@@ -435,28 +355,28 @@ export default function ProductDetailClient({ product }: { product: Product }) {
           <div className="mt-10 border-t border-gray-100 pt-6">
             <h4 className="text-xs font-semibold tracking-wider text-gray-500 uppercase mb-4">Tech Specs</h4>
             <dl className="space-y-3">
-              {fallbackVariant.processor && (
+              {currentVariant.processor && (
                 <div className="flex justify-between text-sm">
                   <dt className="text-gray-500">Processor</dt>
-                  <dd className="text-gray-900 font-medium">{fallbackVariant.processor}</dd>
+                  <dd className="text-gray-900 font-medium">{currentVariant.processor}</dd>
                 </div>
               )}
-              {fallbackVariant.ram_gb && (
+              {currentVariant.ram_gb && (
                 <div className="flex justify-between text-sm">
                   <dt className="text-gray-500">Memory</dt>
-                  <dd className="text-gray-900 font-medium">{fallbackVariant.ram_gb}GB unified</dd>
+                  <dd className="text-gray-900 font-medium">{currentVariant.ram_gb}GB unified</dd>
                 </div>
               )}
-              {selectedStorage && (
+              {currentVariant.storage_gb && (
                 <div className="flex justify-between text-sm">
                   <dt className="text-gray-500">Storage</dt>
-                  <dd className="text-gray-900 font-medium">{formatStorage(selectedStorage)} SSD</dd>
+                  <dd className="text-gray-900 font-medium">{formatStorage(currentVariant.storage_gb)} SSD</dd>
                 </div>
               )}
-              {fallbackVariant.screen_size && (
+              {currentVariant.screen_size && (
                 <div className="flex justify-between text-sm">
                   <dt className="text-gray-500">Display</dt>
-                  <dd className="text-gray-900 font-medium">{fallbackVariant.screen_size}&quot;</dd>
+                  <dd className="text-gray-900 font-medium">{currentVariant.screen_size}&quot;</dd>
                 </div>
               )}
               {selectedColor && (
@@ -465,13 +385,6 @@ export default function ProductDetailClient({ product }: { product: Product }) {
                   <dd className="text-gray-900 font-medium">{selectedColor}</dd>
                 </div>
               )}
-              {fallbackVariant.attributes &&
-                Object.entries(fallbackVariant.attributes).map(([key, val]) => (
-                  <div key={key} className="flex justify-between text-sm">
-                    <dt className="text-gray-500 capitalize">{key.replace(/_/g, " ")}</dt>
-                    <dd className="text-gray-900 font-medium">{String(val)}</dd>
-                  </div>
-                ))}
             </dl>
           </div>
 
