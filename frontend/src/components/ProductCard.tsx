@@ -90,11 +90,11 @@ const getScaleClass = (brand?: string | null, categorySlug?: string | null) => {
 export default function ProductCard({
   product,
   activeFilters = {},
-  activeMaxPrice = Infinity
+  activePriceRange
 }: {
   product: Product;
   activeFilters?: Record<string, (string | number)[]>;
-  activeMaxPrice?: number;
+  activePriceRange?: { min: number, max: number };
 }) {
   const variantLevelSlugs = ["ram_gb", "storage_gb", "processor", "screen_size"];
 
@@ -107,7 +107,7 @@ export default function ProductCard({
   if (product.variants && product.variants.length > 0) {
     const matchingVariants = product.variants.filter((variant) => {
       const vPrice = parseFloat(variant.price);
-      if (vPrice > activeMaxPrice) return false;
+      if (activePriceRange && (vPrice > activePriceRange.max || vPrice < activePriceRange.min)) return false;
 
       for (const [slug, values] of activeVariantFilters) {
         const vVal = variant[slug as keyof typeof variant];
@@ -174,7 +174,7 @@ export default function ProductCard({
   const processorBadge = processor ? PROCESSOR_BADGES[processor] : null;
 
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0, y: 20 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-50px" }}
@@ -188,10 +188,9 @@ export default function ProductCard({
           {/* Top Left Area - Brand Logo & Badge */}
           <div className="absolute top-4 left-4 z-10 flex items-center gap-2 opacity-80 mix-blend-multiply">
             {brandLogo && (
-              <div className={`relative w-7 h-7 ${
-                product.brand?.name?.toLowerCase() === 'apple' ? 'scale-[0.7]' : 
-                product.brand?.name?.toLowerCase() === 'dell' ? 'scale-[0.8]' : 'scale-90'
-              }`}>
+              <div className={`relative w-7 h-7 ${product.brand?.name?.toLowerCase() === 'apple' ? 'scale-[0.7]' :
+                  product.brand?.name?.toLowerCase() === 'dell' ? 'scale-[0.8]' : 'scale-90'
+                }`}>
                 <Image src={brandLogo} alt={product.brand?.name || 'Brand logo'} fill className="object-contain" />
               </div>
             )}
@@ -217,23 +216,22 @@ export default function ProductCard({
           {/* Processor Badge - Bottom Right */}
           {processorBadge && (
             <div className="absolute bottom-3 right-3 z-10 w-9 h-9 pointer-events-none">
-              <Image 
-                src={processorBadge} 
-                alt={processor || 'Processor badge'} 
-                fill 
-                className={`object-contain rounded drop-shadow-sm ${
-                  processor?.toLowerCase().includes('m5') ? 'scale-[1.8]' :
-                  processor?.toLowerCase().includes('m4') ? 'scale-[1.15]' :
-                  processor?.toLowerCase().includes('m3') ? 'scale-[1.15]' :
-                  'scale-[0.85]'
-                }`} 
+              <Image
+                src={processorBadge}
+                alt={processor || 'Processor badge'}
+                fill
+                className={`object-contain rounded drop-shadow-sm ${processor?.toLowerCase().includes('m5') ? 'scale-[1.8]' :
+                    processor?.toLowerCase().includes('m4') ? 'scale-[1.15]' :
+                      processor?.toLowerCase().includes('m3') ? 'scale-[1.15]' :
+                        'scale-[0.85]'
+                  }`}
               />
             </div>
           )}
         </div>
 
         {/* Info */}
-        <h3 className="text-sm font-bold text-gray-900 group-hover:text-blue-600 transition-colors">
+        <h3 className="text-sm font-bold text-gray-900 group-hover:text-gray-600 transition-colors">
           {product.name}
         </h3>
 

@@ -7,6 +7,7 @@ import { CartProvider } from "@/components/CartContext";
 import { AuthProvider } from "@/components/AuthContext";
 import CartDrawer from "@/components/CartDrawer";
 import PageTransition from "@/components/PageTransition";
+import Script from "next/script";
 
 const outfit = Outfit({ subsets: ["latin"] });
 
@@ -22,6 +23,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <Script src="https://cdn.alyapay.com/js/alya-placement.js" strategy="afterInteractive" />
+      </head>
       <body className={`${outfit.className} bg-background text-gray-900 antialiased`}>
         <AuthProvider>
           <CartProvider>

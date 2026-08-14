@@ -175,24 +175,6 @@ export default function CartDrawer() {
                         ))}
                       </AnimatePresence>
                     </ul>
-
-                    {/* Frequently bought together placeholder to fill space */}
-                    <div className="mt-8 pt-8 border-t border-gray-100 flex-shrink-0">
-                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">
-                        Frequently bought together
-                      </p>
-                      <div className="flex gap-4">
-                        <div className="flex-1 flex gap-3">
-                          <div className="w-14 h-14 bg-gray-50 rounded-lg flex-shrink-0 border border-gray-100 p-2">
-                             <div className="w-full h-full bg-gray-200 rounded-md animate-pulse"></div>
-                          </div>
-                          <div className="flex flex-col justify-center">
-                            <div className="w-24 h-3 bg-gray-200 rounded animate-pulse mb-2"></div>
-                            <div className="w-16 h-3 bg-gray-200 rounded animate-pulse"></div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
                   </div>
                 )}
               </div>

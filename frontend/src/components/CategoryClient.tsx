@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Category } from "@/lib/api";
 import ProductCard from "./ProductCard";
 import SidebarFilter from "./SidebarFilter";
@@ -11,14 +11,30 @@ import { useRouter } from "next/navigation";
 const variantLevelSlugs = ["ram_gb", "storage_gb", "processor", "screen_size"];
 
 export default function CategoryClient({ category }: { category: Category }) {
-  const products = category.products ?? [];
+  const products = useMemo(() => category.products ?? [], [category.products]);
   const filtersDef = category.filters ?? [];
   const priceRange = category.price ?? { min: 0, max: 0 };
   const router = useRouter();
 
   const [selectedFilters, setSelectedFilters] = useState<Record<string, (string | number)[]>>({});
-  const [selectedMaxPrice, setSelectedMaxPrice] = useState<number>(priceRange.max);
+  const [selectedPriceRange, setSelectedPriceRange] = useState<{min: number, max: number}>(priceRange);
   const [inStockOnly, setInStockOnly] = useState<boolean>(false);
+
+  const [activeFilters, setActiveFilters] = useState(selectedFilters);
+  const [activePriceRange, setActivePriceRange] = useState(selectedPriceRange);
+  const [activeInStockOnly, setActiveInStockOnly] = useState(inStockOnly);
+  const [isFiltering, setIsFiltering] = useState(false);
+
+  useEffect(() => {
+    setIsFiltering(true);
+    const t = setTimeout(() => {
+      setActiveFilters(selectedFilters);
+      setActivePriceRange(selectedPriceRange);
+      setActiveInStockOnly(inStockOnly);
+      setIsFiltering(false);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [selectedFilters, selectedPriceRange, inStockOnly]);
 
   const handleFilterChange = (slug: string, value: string | number) => {
     if (slug === "category") {
@@ -42,17 +58,17 @@ export default function CategoryClient({ category }: { category: Category }) {
 
   const clearAllFilters = () => {
     setSelectedFilters({});
-    setSelectedMaxPrice(priceRange.max);
+    setSelectedPriceRange(priceRange);
     setInStockOnly(false);
   };
 
   const filteredProducts = useMemo(() => {
     return products.filter((product) => {
       // 1. In Stock Check
-      if (inStockOnly && product.stock <= 0) return false;
+      if (activeInStockOnly && product.stock <= 0) return false;
 
       // 2. Product-level Filters (Brand, Custom Attributes)
-      for (const [slug, values] of Object.entries(selectedFilters)) {
+      for (const [slug, values] of Object.entries(activeFilters)) {
         if (values.length === 0) continue;
         if (variantLevelSlugs.includes(slug)) continue;
 
@@ -71,7 +87,7 @@ export default function CategoryClient({ category }: { category: Category }) {
 
       // 3. Variant-level Filters (RAM, Storage, Processor, Price)
       // A product is valid if at least ONE variant satisfies ALL selected variant filters AND price
-      const activeVariantFilters = Object.entries(selectedFilters).filter(
+      const activeVariantFilters = Object.entries(activeFilters).filter(
         ([slug, values]) => variantLevelSlugs.includes(slug) && values.length > 0
       );
 
@@ -83,7 +99,7 @@ export default function CategoryClient({ category }: { category: Category }) {
       const hasMatchingVariant = product.variants.some((variant) => {
         // Price check
         const price = parseFloat(variant.price);
-        if (price > selectedMaxPrice) return false;
+        if (price > activePriceRange.max || price < activePriceRange.min) return false;
 
         // Variant filters check
         for (const [slug, values] of activeVariantFilters) {
@@ -97,7 +113,7 @@ export default function CategoryClient({ category }: { category: Category }) {
 
       return true;
     });
-  }, [category.products, products, inStockOnly, selectedFilters, selectedMaxPrice]);
+  }, [products, activeInStockOnly, activeFilters, activePriceRange]);
 
   // Active Chips
   const activeChips: { slug: string; value: string | number; label: string }[] = [];
@@ -116,7 +132,7 @@ export default function CategoryClient({ category }: { category: Category }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-10">
+    <div className="max-w-[1400px] mx-auto px-6 py-10 w-full">
       {/* Header */}
       <div className="flex flex-col mb-8 border-b border-gray-100 pb-6">
         <div className="flex items-center justify-between mb-4">
@@ -138,7 +154,7 @@ export default function CategoryClient({ category }: { category: Category }) {
         </div>
 
         {/* Active Filters */}
-        {(activeChips.length > 0 || selectedMaxPrice < priceRange.max || inStockOnly) && (
+        {(activeChips.length > 0 || selectedPriceRange.min > priceRange.min || selectedPriceRange.max < priceRange.max || inStockOnly) && (
           <div className="flex flex-wrap items-center gap-2 mt-2">
             <span className="text-xs text-gray-400 mr-2 uppercase tracking-wider font-semibold">Active:</span>
             
@@ -153,12 +169,12 @@ export default function CategoryClient({ category }: { category: Category }) {
               </button>
             ))}
 
-            {selectedMaxPrice < priceRange.max && (
+            {(selectedPriceRange.min > priceRange.min || selectedPriceRange.max < priceRange.max) && (
               <button
-                onClick={() => setSelectedMaxPrice(priceRange.max)}
+                onClick={() => setSelectedPriceRange(priceRange)}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm rounded-full transition-colors"
               >
-                ≤ {formatPrice(selectedMaxPrice)} MAD
+                {formatPrice(selectedPriceRange.min)} - {formatPrice(selectedPriceRange.max)} MAD
                 <X className="w-3 h-3 text-gray-500" />
               </button>
             )}
@@ -198,8 +214,8 @@ export default function CategoryClient({ category }: { category: Category }) {
               priceRange={priceRange}
               selectedFilters={selectedFilters}
               onFilterChange={handleFilterChange}
-              selectedMaxPrice={selectedMaxPrice}
-              onPriceChange={setSelectedMaxPrice}
+              selectedPriceRange={selectedPriceRange}
+              onPriceChange={setSelectedPriceRange}
               inStockOnly={inStockOnly}
               onInStockChange={setInStockOnly}
             />
@@ -207,15 +223,24 @@ export default function CategoryClient({ category }: { category: Category }) {
         </div>
 
         {/* Product Grid */}
-        <div className="flex-1">
+        <div className="flex-1 relative">
+          {isFiltering && (
+            <div className="absolute inset-0 z-10 bg-white/50 backdrop-blur-[2px] rounded-2xl transition-all duration-300 flex items-start justify-center pt-32">
+              <div className="flex gap-2">
+                <div className="w-2.5 h-2.5 bg-[#002366] rounded-full animate-silky-pulse" style={{ animationDelay: '0ms' }}></div>
+                <div className="w-2.5 h-2.5 bg-[#002366] rounded-full animate-silky-pulse" style={{ animationDelay: '200ms' }}></div>
+                <div className="w-2.5 h-2.5 bg-[#002366] rounded-full animate-silky-pulse" style={{ animationDelay: '400ms' }}></div>
+              </div>
+            </div>
+          )}
           {filteredProducts.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6">
               {filteredProducts.map((product) => (
                 <ProductCard 
                   key={product.id} 
                   product={{ ...product, category: product.category || category }} 
-                  activeFilters={selectedFilters}
-                  activeMaxPrice={selectedMaxPrice}
+                  activeFilters={activeFilters}
+                  activePriceRange={activePriceRange}
                 />
               ))}
             </div>

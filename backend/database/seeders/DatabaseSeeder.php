@@ -164,12 +164,18 @@ class DatabaseSeeder extends Seeder
         $mbp14Images = ['/images/products/laptops/MacBook pro/black mac pro 14.png', '/images/products/laptops/MacBook pro/silver mac pro 14.png'];
         $mbp16Images = ['/images/products/laptops/MacBook pro/black mac pro 16.png', '/images/products/laptops/MacBook pro/silver mac pro 16.png'];
         $mbaImages = ['/images/products/laptops/MacBook Air/midnight air 13.png', '/images/products/laptops/MacBook Air/starlight air 13.png', '/images/products/laptops/MacBook Air/silver air 13.png', '/images/products/laptops/MacBook Air/skyblue air 13.png'];
-        $xpsImages = ['/images/products/laptops/DELL/BLACK XPS 15.png', '/images/products/laptops/DELL/XPS 15 WHITE.png'];
+        $xps13Images = ['/images/products/laptops/DELL/WHITE XPS13.png'];
+        $xps14Images = ['/images/products/laptops/DELL/BLACK XPS 14.png', '/images/products/laptops/DELL/WHITE XPS 14.png'];
+        $xps16Images = ['/images/products/laptops/DELL/WHITE XPS 16.png'];
+        $alienwareM15Images = ['/images/products/laptops/DELL/alienware m15.png'];
         $tpImages = ['/images/products/laptops/Lenovo/ThinkPad X1 Carbon.png'];
 
         $mbColors = ['Space Black', 'Silver'];
         $mbaColors = ['Midnight', 'Starlight', 'Silver', 'Skyblue'];
         $xpsColors = ['Black', 'White'];
+        $xps13Colors = ['White'];
+        $xps16Colors = ['White'];
+        $alienwareColors = ['Dark Side of the Moon'];
         
         $laptopsToSeed = [
             // MacBook Air 13" (M3)
@@ -220,31 +226,31 @@ class DatabaseSeeder extends Seeder
             ['MacBook Pro 16"', 'APP-MBP16', $seriesMBP16, $apple, 'M5 Max 40-core', 64, 4096, 62990, 16.2, $mbColors, $mbp16Images],
             ['MacBook Pro 16"', 'APP-MBP16', $seriesMBP16, $apple, 'M5 Max 40-core', 128, 8192, 89990, 16.2, $mbColors, $mbp16Images],
             // Dell XPS 13
-            ['XPS 13', 'DEL-XPS13', $seriesXPS15, $dell, 'Core Ultra 5', 16, 512, 14490, 13.4, $xpsColors, $xpsImages],
-            ['XPS 13', 'DEL-XPS13', $seriesXPS15, $dell, 'Core Ultra 7', 16, 512, 16990, 13.4, $xpsColors, $xpsImages],
-            ['XPS 13', 'DEL-XPS13', $seriesXPS15, $dell, 'Core Ultra 7', 16, 1024, 18990, 13.4, $xpsColors, $xpsImages],
-            ['XPS 13', 'DEL-XPS13', $seriesXPS15, $dell, 'Core Ultra 7', 32, 1024, 21990, 13.4, $xpsColors, $xpsImages],
-            ['XPS 13', 'DEL-XPS13', $seriesXPS15, $dell, 'Core Ultra 7', 64, 2048, 27990, 13.4, $xpsColors, $xpsImages],
+            ['XPS 13', 'DEL-XPS13', $seriesXPS15, $dell, 'Core Ultra 5', 16, 512, 14490, 13.4, $xps13Colors, $xps13Images],
+            ['XPS 13', 'DEL-XPS13', $seriesXPS15, $dell, 'Core Ultra 7', 16, 512, 16990, 13.4, $xps13Colors, $xps13Images],
+            ['XPS 13', 'DEL-XPS13', $seriesXPS15, $dell, 'Core Ultra 7', 16, 1024, 18990, 13.4, $xps13Colors, $xps13Images],
+            ['XPS 13', 'DEL-XPS13', $seriesXPS15, $dell, 'Core Ultra 7', 32, 1024, 21990, 13.4, $xps13Colors, $xps13Images],
+            ['XPS 13', 'DEL-XPS13', $seriesXPS15, $dell, 'Core Ultra 7', 64, 2048, 27990, 13.4, $xps13Colors, $xps13Images],
             // Dell XPS 14
-            ['XPS 14', 'DEL-XPS14', $seriesXPS15, $dell, 'Core Ultra 7', 16, 512, 18490, 14.5, $xpsColors, $xpsImages],
-            ['XPS 14', 'DEL-XPS14', $seriesXPS15, $dell, 'Core Ultra 7', 32, 1024, 23490, 14.5, $xpsColors, $xpsImages],
-            ['XPS 14', 'DEL-XPS14', $seriesXPS15, $dell, 'Core Ultra 7', 64, 2048, 29490, 14.5, $xpsColors, $xpsImages],
-            ['XPS 14', 'DEL-XPS14', $seriesXPS15, $dell, 'Core Ultra 9', 32, 1024, 26990, 14.5, $xpsColors, $xpsImages],
-            ['XPS 14', 'DEL-XPS14', $seriesXPS15, $dell, 'Core Ultra 9', 64, 2048, 32990, 14.5, $xpsColors, $xpsImages],
+            ['XPS 14', 'DEL-XPS14', $seriesXPS15, $dell, 'Core Ultra 7', 16, 512, 18490, 14.5, $xpsColors, $xps14Images],
+            ['XPS 14', 'DEL-XPS14', $seriesXPS15, $dell, 'Core Ultra 7', 32, 1024, 23490, 14.5, $xpsColors, $xps14Images],
+            ['XPS 14', 'DEL-XPS14', $seriesXPS15, $dell, 'Core Ultra 7', 64, 2048, 29490, 14.5, $xpsColors, $xps14Images],
+            ['XPS 14', 'DEL-XPS14', $seriesXPS15, $dell, 'Core Ultra 9', 32, 1024, 26990, 14.5, $xpsColors, $xps14Images],
+            ['XPS 14', 'DEL-XPS14', $seriesXPS15, $dell, 'Core Ultra 9', 64, 2048, 32990, 14.5, $xpsColors, $xps14Images],
             // Dell XPS 16
-            ['XPS 16', 'DEL-XPS16', $seriesXPS15, $dell, 'Core Ultra 7', 16, 512, 20990, 16.3, $xpsColors, $xpsImages],
-            ['XPS 16', 'DEL-XPS16', $seriesXPS15, $dell, 'Core Ultra 7', 32, 1024, 25990, 16.3, $xpsColors, $xpsImages],
-            ['XPS 16', 'DEL-XPS16', $seriesXPS15, $dell, 'Core Ultra 7', 64, 2048, 31990, 16.3, $xpsColors, $xpsImages],
-            ['XPS 16', 'DEL-XPS16', $seriesXPS15, $dell, 'Core Ultra 9', 32, 1024, 28990, 16.3, $xpsColors, $xpsImages],
-            ['XPS 16', 'DEL-XPS16', $seriesXPS15, $dell, 'Core Ultra 9', 64, 2048, 34990, 16.3, $xpsColors, $xpsImages],
-            ['XPS 16', 'DEL-XPS16', $seriesXPS15, $dell, 'Core Ultra 9', 64, 4096, 38990, 16.3, $xpsColors, $xpsImages],
-            ['XPS 16', 'DEL-XPS16', $seriesXPS15, $dell, 'Core Ultra 9', 96, 4096, 45990, 16.3, $xpsColors, $xpsImages],
-            // Dell Alienware m16
-            ['Alienware m16', 'DEL-AM16', $seriesXPS15, $dell, 'Core i7', 16, 1024, 21490, 16.0, $xpsColors, $xpsImages],
-            ['Alienware m16', 'DEL-AM16', $seriesXPS15, $dell, 'Core i7', 32, 1024, 23990, 16.0, $xpsColors, $xpsImages],
-            ['Alienware m16', 'DEL-AM16', $seriesXPS15, $dell, 'Core i9', 32, 1024, 27490, 16.0, $xpsColors, $xpsImages],
-            ['Alienware m16', 'DEL-AM16', $seriesXPS15, $dell, 'Core i9', 64, 2048, 33990, 16.0, $xpsColors, $xpsImages],
-            ['Alienware m16', 'DEL-AM16', $seriesXPS15, $dell, 'Core i9', 64, 4096, 37990, 16.0, $xpsColors, $xpsImages],
+            ['XPS 16', 'DEL-XPS16', $seriesXPS15, $dell, 'Core Ultra 7', 16, 512, 20990, 16.3, $xps16Colors, $xps16Images],
+            ['XPS 16', 'DEL-XPS16', $seriesXPS15, $dell, 'Core Ultra 7', 32, 1024, 25990, 16.3, $xps16Colors, $xps16Images],
+            ['XPS 16', 'DEL-XPS16', $seriesXPS15, $dell, 'Core Ultra 7', 64, 2048, 31990, 16.3, $xps16Colors, $xps16Images],
+            ['XPS 16', 'DEL-XPS16', $seriesXPS15, $dell, 'Core Ultra 9', 32, 1024, 28990, 16.3, $xps16Colors, $xps16Images],
+            ['XPS 16', 'DEL-XPS16', $seriesXPS15, $dell, 'Core Ultra 9', 64, 2048, 34990, 16.3, $xps16Colors, $xps16Images],
+            ['XPS 16', 'DEL-XPS16', $seriesXPS15, $dell, 'Core Ultra 9', 64, 4096, 38990, 16.3, $xps16Colors, $xps16Images],
+            ['XPS 16', 'DEL-XPS16', $seriesXPS15, $dell, 'Core Ultra 9', 96, 4096, 45990, 16.3, $xps16Colors, $xps16Images],
+            // Dell Alienware m15
+            ['Alienware m15', 'DEL-AM15', $seriesXPS15, $dell, 'Core i7', 16, 1024, 19490, 15.6, $alienwareColors, $alienwareM15Images],
+            ['Alienware m15', 'DEL-AM15', $seriesXPS15, $dell, 'Core i7', 32, 1024, 21990, 15.6, $alienwareColors, $alienwareM15Images],
+            ['Alienware m15', 'DEL-AM15', $seriesXPS15, $dell, 'Core i9', 32, 1024, 25490, 15.6, $alienwareColors, $alienwareM15Images],
+            ['Alienware m15', 'DEL-AM15', $seriesXPS15, $dell, 'Core i9', 64, 2048, 31990, 15.6, $alienwareColors, $alienwareM15Images],
+            ['Alienware m15', 'DEL-AM15', $seriesXPS15, $dell, 'Core i9', 64, 4096, 35990, 15.6, $alienwareColors, $alienwareM15Images],
             // Lenovo ThinkPad X1 Carbon
             ['ThinkPad X1 Carbon', 'LEN-TPX1', $seriesTPX1, $lenovo, 'Core Ultra 5', 16, 512, 17490, 14.0, ['Black'], $tpImages],
             ['ThinkPad X1 Carbon', 'LEN-TPX1', $seriesTPX1, $lenovo, 'Core Ultra 5', 16, 1024, 19490, 14.0, ['Black'], $tpImages],

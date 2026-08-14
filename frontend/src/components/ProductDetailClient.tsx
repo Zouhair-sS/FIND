@@ -3,6 +3,9 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useMemo, useState, useEffect } from "react";
+import { createPortal } from "react-dom";
+import { motion, AnimatePresence } from "framer-motion";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { Product } from "@/lib/api";
 import { useCart } from "./CartContext";
 import { formatPrice } from "@/lib/formatPrice";
@@ -45,17 +48,35 @@ const COLOR_MAP: Record<string, string> = {
 };
 
 const getScaleClass = (brand?: string | null, categorySlug?: string | null) => {
+  const b = brand?.toLowerCase() || '';
   if (categorySlug === 'laptops') {
-    if (brand?.toLowerCase() === 'apple') return 'scale-[1.35]'; 
-    return 'scale-[0.95]'; 
+    if (b === 'apple') return 'scale-[1.35]'; 
+    if (b === 'dell' || b === 'alienware') return 'scale-[1.25]';
+    if (b === 'lenovo') return 'scale-[0.9]';
+    return 'scale-[1.1]'; 
   }
   if (categorySlug === 'smartphones') {
-    if (brand?.toLowerCase() === 'google' || brand?.toLowerCase() === 'samsung') {
+    if (b === 'google' || b === 'samsung') {
       return 'scale-[1.6]';
     }
-    return 'scale-100';
+    return 'scale-[1.1]';
   }
   return 'scale-100';
+};
+
+const imageVariants = {
+  enter: (direction: number) => ({
+    x: direction === 0 ? 0 : (direction > 0 ? '100%' : '-100%'),
+    opacity: 0
+  }),
+  center: {
+    x: 0,
+    opacity: 1
+  },
+  exit: (direction: number) => ({
+    x: direction === 0 ? 0 : (direction < 0 ? '100%' : '-100%'),
+    opacity: 0
+  })
 };
 
 interface RelatedConfig {
@@ -81,9 +102,14 @@ export default function ProductDetailClient({ product }: { product: Product }) {
   const [quantity, setQuantity] = useState(1);
   const [addedToCart, setAddedToCart] = useState(false);
   const [relatedConfigs, setRelatedConfigs] = useState<RelatedConfig[]>([]);
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [slideDirection, setSlideDirection] = useState(0);
 
   useEffect(() => {
-    fetch(`/api/products/${product.slug}/configurations`)
+    setMounted(true);
+    const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api";
+    fetch(`${apiBase}/products/${product.slug}/configurations`)
       .then(res => res.json())
       .then(data => setRelatedConfigs(data))
       .catch(console.error);
@@ -130,6 +156,7 @@ export default function ProductDetailClient({ product }: { product: Product }) {
       }
     });
     if (bestIdx !== -1 && maxScore > 0) {
+      setSlideDirection(0);
       setSelectedImageIdx(bestIdx);
     }
   };
@@ -180,22 +207,64 @@ export default function ProductDetailClient({ product }: { product: Product }) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
         {/* ── Left: Images ──────────────────────────────────── */}
         <div>
-          <div className="relative aspect-square rounded-xl overflow-hidden mb-4 bg-gray-50/50">
-            {images[selectedImageIdx] ? (
-              <Image
-                src={images[selectedImageIdx].url}
-                alt={product.name}
-                fill
-                className={`object-contain p-8 transition-transform duration-500 ${getScaleClass(product.brand?.name, product.category?.slug)}`}
-                sizes="(max-width: 768px) 100vw, 50vw"
-                priority
-              />
-            ) : (
-              <div className="flex items-center justify-center h-full text-gray-300">
-                <svg className="w-24 h-24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
-              </div>
+          <div 
+            className="relative aspect-square rounded-xl overflow-hidden mb-4 bg-gray-50/50 group cursor-zoom-in"
+            onClick={() => setIsLightboxOpen(true)}
+          >
+            <AnimatePresence initial={false} custom={slideDirection}>
+              {images[selectedImageIdx] ? (
+                <motion.div
+                  key={selectedImageIdx}
+                  custom={slideDirection}
+                  variants={imageVariants}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                  transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                  className="absolute inset-0 flex items-center justify-center pointer-events-none"
+                >
+                  <Image
+                    src={images[selectedImageIdx].url}
+                    alt={product.name}
+                    fill
+                    className={`object-contain p-8 ${getScaleClass(product.brand?.name, product.category?.slug)}`}
+                    sizes="(max-width: 768px) 100vw, 50vw"
+                    priority
+                  />
+                </motion.div>
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center text-gray-300 pointer-events-none">
+                  <svg className="w-24 h-24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                </div>
+              )}
+            </AnimatePresence>
+            
+            {/* Arrows for multiple images */}
+            {images.length > 1 && (
+              <>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSlideDirection(-1);
+                    setSelectedImageIdx((prev) => (prev > 0 ? prev - 1 : images.length - 1));
+                  }}
+                  className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/80 hover:bg-white text-gray-800 rounded-full flex items-center justify-center shadow-md opacity-0 group-hover:opacity-100 transition-all z-10"
+                >
+                  <ChevronLeft className="w-6 h-6" />
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSlideDirection(1);
+                    setSelectedImageIdx((prev) => (prev < images.length - 1 ? prev + 1 : 0));
+                  }}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/80 hover:bg-white text-gray-800 rounded-full flex items-center justify-center shadow-md opacity-0 group-hover:opacity-100 transition-all z-10"
+                >
+                  <ChevronRight className="w-6 h-6" />
+                </button>
+              </>
             )}
           </div>
 
@@ -205,7 +274,12 @@ export default function ProductDetailClient({ product }: { product: Product }) {
               {images.map((img, idx) => (
                 <button
                   key={img.id}
-                  onClick={() => setSelectedImageIdx(idx)}
+                  onClick={() => {
+                    if (idx !== selectedImageIdx) {
+                      setSlideDirection(idx > selectedImageIdx ? 1 : -1);
+                      setSelectedImageIdx(idx);
+                    }
+                  }}
                   className={`relative w-16 h-16 rounded-lg overflow-hidden border-2 transition-colors cursor-pointer ${
                     idx === selectedImageIdx ? "border-gray-900" : "border-gray-100 hover:border-gray-300"
                   }`}
@@ -227,40 +301,21 @@ export default function ProductDetailClient({ product }: { product: Product }) {
             <span className="text-base font-normal text-gray-400 tracking-wide">MAD</span>
           </p>
 
+          <div className="mt-6 mb-2 min-h-[60px]">
+            <alya-placement
+              key={`credit-promotion-${price}`}
+              price={price}
+              currency="MAD"
+              lang="fr"
+              installments="4"
+              variant="interactive"
+              theme="light-plain"
+              detail="panel"
+              logo-position="left"
+            />
+          </div>
+
           <p className="text-gray-500 mt-4 leading-relaxed">{product.description}</p>
-
-          {/* Available Configurations */}
-          {relatedConfigs.length > 0 && (
-             <div className="mt-8">
-               <h4 className="text-sm font-semibold tracking-wider text-gray-900 uppercase mb-4">Choose your configuration</h4>
-               <div className="flex flex-col gap-2">
-                 
-                 {/* Current Config */}
-                 <div className="flex justify-between items-center px-4 py-3 border-2 border-gray-900 bg-gray-50 rounded-lg">
-                   <div>
-                     <p className="text-sm font-semibold text-gray-900">{configText || "Base Configuration"}</p>
-                   </div>
-                   <p className="text-sm font-bold text-gray-900">{formatPrice(price)} MAD</p>
-                 </div>
-
-                 {/* Related Configs */}
-                 {relatedConfigs.map(c => {
-                   const cParts = [];
-                   if (c.ram_gb) cParts.push(`${c.ram_gb}GB`);
-                   if (c.storage_gb) cParts.push(formatStorage(c.storage_gb));
-                   const cText = cParts.length > 0 ? cParts.join(' · ') : c.processor || "Configuration";
-                   return (
-                     <Link key={c.id} href={`/product/${c.slug}`} className="flex justify-between items-center px-4 py-3 border border-gray-200 hover:border-gray-400 rounded-lg transition-colors group cursor-pointer">
-                       <div>
-                         <p className="text-sm font-medium text-gray-600 group-hover:text-gray-900 transition-colors">{cText}</p>
-                       </div>
-                       <p className="text-sm font-medium text-gray-600 group-hover:text-gray-900 transition-colors">{formatPrice(c.price)} MAD</p>
-                     </Link>
-                   )
-                 })}
-               </div>
-             </div>
-          )}
 
           {/* Color selector */}
           {colors.length > 0 && product.category?.slug !== 'monitors' && (
@@ -392,6 +447,76 @@ export default function ProductDetailClient({ product }: { product: Product }) {
           {currentVariant && <p className="mt-6 text-xs text-gray-400">SKU: {currentVariant.sku}</p>}
         </div>
       </div>
+
+      {/* Lightbox Modal */}
+      {mounted && createPortal(
+        <AnimatePresence>
+          {isLightboxOpen && images[selectedImageIdx] && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsLightboxOpen(false)}
+              className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm cursor-zoom-out"
+            >
+              {/* Lightbox Arrows */}
+              {images.length > 1 && (
+                <>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedImageIdx((prev) => (prev > 0 ? prev - 1 : images.length - 1));
+                    }}
+                    className="absolute left-4 md:left-8 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/10 hover:bg-white/20 text-white rounded-full flex items-center justify-center transition-all z-10"
+                  >
+                    <ChevronLeft className="w-8 h-8" />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedImageIdx((prev) => (prev < images.length - 1 ? prev + 1 : 0));
+                    }}
+                    className="absolute right-4 md:right-8 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/10 hover:bg-white/20 text-white rounded-full flex items-center justify-center transition-all z-10"
+                  >
+                    <ChevronRight className="w-8 h-8" />
+                  </button>
+                </>
+              )}
+              <motion.div 
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                className="relative w-[90vw] h-[90vh] max-w-5xl max-h-[800px] overflow-hidden rounded-xl"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <AnimatePresence initial={false} custom={slideDirection}>
+                  <motion.div
+                    key={selectedImageIdx}
+                    custom={slideDirection}
+                    variants={imageVariants}
+                    initial="enter"
+                    animate="center"
+                    exit="exit"
+                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                    className="absolute inset-0"
+                  >
+                    <Image
+                      src={images[selectedImageIdx].url}
+                      alt={product.name}
+                      fill
+                      className="object-contain"
+                      sizes="100vw"
+                      quality={100}
+                    />
+                  </motion.div>
+                </AnimatePresence>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </div>
   );
 }

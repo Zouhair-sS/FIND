@@ -2,7 +2,6 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo } from "react";
 import { fetchProductBySlug } from "@/lib/api";
-import type { Product, ProductVariant } from "@/lib/api";
 
 // A UUID generator for the cart
 function generateUUID() {
@@ -61,14 +60,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   // 1. Load from local storage
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsMounted(true);
-    const saved = localStorage.getItem("find_cart_v2");
+    const saved = localStorage.getItem("find_cart_v3");
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
         if (!parsed.cartId) parsed.cartId = generateUUID();
         setState(parsed);
-      } catch (e) {
+      } catch {
         setState({ cartId: generateUUID(), items: [] });
       }
     } else {
@@ -79,7 +79,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   // 2. Save to local storage
   useEffect(() => {
     if (isMounted && state.cartId) {
-      localStorage.setItem("find_cart_v2", JSON.stringify(state));
+      localStorage.setItem("find_cart_v3", JSON.stringify(state));
     }
   }, [state, isMounted]);
 
@@ -105,7 +105,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
                 stock: v.stock_quantity
               };
             });
-          } catch (e) {
+          } catch {
             console.error(`Failed to fetch product ${slug} for live prices`);
           }
         }));

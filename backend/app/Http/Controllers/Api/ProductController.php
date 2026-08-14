@@ -90,7 +90,6 @@ class ProductController extends Controller
             }, 'category', 'variants' => function ($q) {
                 $q->orderBy('price')->limit(1);
             }])
-            ->limit(8)
             ->get();
 
         return response()->json($products);

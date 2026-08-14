@@ -26,8 +26,9 @@ export default function RegisterPage() {
     try {
       await register({ first_name: firstName, last_name: lastName, email, password });
       router.push("/cart"); 
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to create account.");
+    } catch (err) {
+      const error = err as { response?: { data?: { message?: string } } };
+      setError(error.response?.data?.message || "Failed to create account.");
     } finally {
       setLoading(false);
     }
@@ -42,7 +43,7 @@ export default function RegisterPage() {
           <div className="max-w-md mx-auto w-full">
             <h1 className="text-4xl font-bold text-primary mb-2">Sign Up</h1>
             <p className="text-gray-500 mb-10">
-              Let's start your wonderful journey with FIND.
+              Let&apos;s start your wonderful journey with FIND.
             </p>
 
             <form onSubmit={handleSubmit} className="space-y-6">

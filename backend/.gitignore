@@ -22,3 +22,6 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+backend/test_alyapay.php
+backend/test2_alyapay.php

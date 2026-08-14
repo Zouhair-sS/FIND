@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
+
 import type { Product } from "@/lib/api";
 import { useCart } from "./CartContext";
 import { useAuth } from "@/components/AuthContext";
@@ -145,16 +145,26 @@ export default function Navbar() {
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Escape") {
       setSearchOpen(false);
+    } else if (e.key === "Enter" && searchQuery.trim().length > 0) {
+      setSearchOpen(false);
+      router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
     }
   };
 
   return (
     <header className="sticky top-0 z-50 bg-white border-b border-gray-100">
-      <nav className="max-w-7xl mx-auto flex items-center justify-between px-6 h-16">
+      <nav className="max-w-[1400px] w-full mx-auto flex items-center justify-between px-6 h-16">
         {/* Logo */}
         <div className="flex items-center gap-10">
-          <Link href="/" className="text-2xl font-bold tracking-tight text-gray-900">
-            FIND<span className="text-blue-600">.</span>
+          <Link href="/" className="flex items-center">
+            <Image 
+              src="/images/FIND LOGO/FIND LOGO.png" 
+              alt="FIND." 
+              width={160} 
+              height={48} 
+              className="object-contain h-10 md:h-12 w-auto scale-110 origin-left" 
+              priority 
+            />
           </Link>
 
           {/* Desktop Nav */}
@@ -215,60 +225,87 @@ export default function Navbar() {
 
             {/* Desktop Search Results Dropdown */}
             {searchOpen && (searchQuery.trim().length > 0 || isSearching) && (
-              <div className="absolute top-full right-0 mt-3 w-[400px] bg-white rounded-3xl shadow-2xl shadow-primary/5 border border-gray-100 overflow-hidden z-[60]">
+              <div className="absolute top-full right-0 mt-3 w-[650px] bg-white rounded-xl shadow-xl shadow-gray-200/50 border border-gray-200 overflow-hidden z-[60]">
                 {isSearching ? (
-                  <div className="p-8 text-center text-gray-500 flex flex-col items-center gap-3">
-                    <div className="inline-block w-6 h-6 border-2 border-gray-200 border-t-primary rounded-full animate-spin" />
+                  <div className="p-12 text-center text-gray-500 flex flex-col items-center gap-3">
+                    <div className="inline-block w-6 h-6 border-2 border-gray-200 border-t-[#002366] rounded-full animate-spin" />
                     <span className="text-sm">Searching...</span>
                   </div>
                 ) : searchResults.length > 0 ? (
-                  <div className="max-h-[400px] overflow-y-auto">
-                    {searchResults.map((product) => {
-                      const firstImage = product.images?.[0];
-                      const firstVariant = product.variants?.[0];
-                      const price = firstVariant ? parseFloat(firstVariant.price) : 0;
+                  <>
+                    <div className="max-h-[450px] overflow-y-auto p-2">
+                      <div className="grid grid-cols-2 gap-x-2 gap-y-1">
+                        {searchResults.slice(0, 6).map((product) => {
+                          const firstImage = product.images?.[0];
+                          const firstVariant = product.variants?.[0];
+                          const price = firstVariant ? parseFloat(firstVariant.price) : 0;
+                          
+                          // Build a custom name string including variant specifics if any, like the screenshot
+                          const specs = [
+                            firstVariant?.processor ? (firstVariant.processor.includes('Puce') ? firstVariant.processor : `Puce ${firstVariant.processor}`) : null,
+                            firstVariant?.ram_gb ? `${firstVariant.ram_gb}GB` : null,
+                            firstVariant?.storage_gb ? (firstVariant.storage_gb >= 1024 ? `${firstVariant.storage_gb/1024}TB` : `${firstVariant.storage_gb}GB`) : null
+                          ].filter(Boolean).join(' ');
 
-                      return (
-                        <button
-                          key={product.id}
-                          onClick={() => handleResultClick(product)}
-                          className="w-full flex items-center gap-4 px-4 py-3 hover:bg-gray-50 transition-colors text-left border-b border-gray-50 last:border-b-0"
-                        >
-                          {/* Product image */}
-                          <div className="relative w-14 h-14 bg-gray-50 rounded-lg flex-shrink-0 overflow-hidden">
-                            {firstImage ? (
-                              <Image
-                                src={firstImage.url}
-                                alt={product.name}
-                                fill
-                                className="object-contain p-1"
-                                sizes="56px"
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center text-gray-300">
-                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                                </svg>
+                          const variantSpecs = specs ? ` - ${specs}` : '';
+                          const displayName = `${product.name}${variantSpecs}`;
+
+                          return (
+                            <button
+                              key={product.id}
+                              onClick={() => handleResultClick(product)}
+                              className="w-full flex items-center gap-4 p-3 hover:bg-gray-50 transition-colors text-left rounded-lg"
+                            >
+                              {/* Product image */}
+                              <div className="relative w-16 h-16 bg-white flex-shrink-0 flex items-center justify-center">
+                                {firstImage ? (
+                                  <Image
+                                    src={firstImage.url}
+                                    alt={product.name}
+                                    fill
+                                    className="object-contain p-1 mix-blend-multiply"
+                                    sizes="64px"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center text-gray-300">
+                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                    </svg>
+                                  </div>
+                                )}
                               </div>
-                            )}
-                          </div>
 
-                          {/* Product info */}
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-900 truncate">{product.name}</p>
-                            <p className="text-xs text-gray-400 mt-0.5">{product.category?.name}</p>
-                          </div>
-
-                          {/* Price */}
-                          {price > 0 && (
-                            <span className="text-sm font-semibold text-gray-900 flex-shrink-0">
-                              {formatPrice(price)} <span className="text-xs font-normal text-gray-400">MAD</span>
-                            </span>
-                          )}
+                              {/* Product info */}
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[15px] text-gray-800 leading-tight" title={displayName}>
+                                  {displayName}
+                                </p>
+                                <p className="text-[13px] text-gray-500 mt-1">{product.category?.name}</p>
+                                {price > 0 && (
+                                  <p className="text-[15px] font-medium text-gray-900 mt-0.5">
+                                    {formatPrice(price)}<span className="text-sm">,00DH</span>
+                                  </p>
+                                )}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    {searchResults.length > 0 && (
+                      <div className="p-3 bg-white border-t border-gray-100">
+                        <button
+                          onClick={() => {
+                            setSearchOpen(false);
+                            router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+                          }}
+                          className="w-full py-2.5 bg-[#002366] hover:bg-[#001845] text-white text-[15px] font-medium rounded transition-colors"
+                        >
+                          View all ({searchResults.length})
                         </button>
-                      );
-                    })}
-                  </div>
+                      </div>
+                    )}
+                  </>
                 ) : searchQuery.trim().length > 0 ? (
                   <div className="p-6 text-center">
                     <p className="text-sm text-gray-500">No products found for &ldquo;{searchQuery}&rdquo;</p>

@@ -13,8 +13,8 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   isAuthenticated: boolean;
-  login: (data: any) => Promise<void>;
-  register: (data: any) => Promise<void>;
+  login: (data: Record<string, unknown>) => Promise<void>;
+  register: (data: Record<string, unknown>) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -29,7 +29,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const res = await axios.get("/api/user");
       setUser(res.data);
-    } catch (error) {
+    } catch {
       setUser(null);
     } finally {
       setLoading(false);
@@ -37,16 +37,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     refreshUser();
   }, []);
 
-  const login = async (data: any) => {
+  const login = async (data: Record<string, unknown>) => {
     await axios.get("/sanctum/csrf-cookie");
     await axios.post("/api/login", data);
     await refreshUser();
   };
 
-  const register = async (data: any) => {
+  const register = async (data: Record<string, unknown>) => {
     await axios.get("/sanctum/csrf-cookie");
     await axios.post("/api/register", data);
     await refreshUser();
@@ -55,7 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     try {
       await axios.post("/api/logout");
-    } catch (error) {
+    } catch {
       console.error("Logout failed on server, clearing local state");
     } finally {
       setUser(null);

@@ -23,3 +23,12 @@ Route::get('/products/all-with-filters', [ProductController::class, 'allWithFilt
 Route::get('/products', [ProductController::class, 'index']);
 Route::get('/products/{slug}/configurations', [ProductController::class, 'configurations']);
 Route::get('/products/{slug}', [ProductController::class, 'show']);
+
+use App\Http\Controllers\Api\CheckoutController;
+use App\Http\Controllers\Api\WebhookController;
+
+Route::post('/checkout', [CheckoutController::class, 'initiateCheckout']);
+Route::post('/verify-payment', [CheckoutController::class, 'verifyPayment']);
+Route::get('/orders/{orderNumber}', [CheckoutController::class, 'getOrder']);
+
+Route::post('/webhooks/alyapay', [WebhookController::class, 'handleAlyaPay']);

@@ -34,7 +34,7 @@ export default function CheckoutGateway() {
 
   const itemVariants = {
     hidden: { opacity: 0, y: 30 },
-    show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" } }
+    show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" as const } }
   };
 
   return (
@@ -84,7 +84,7 @@ export default function CheckoutGateway() {
               Sign In
             </Link>
             <div className="text-center text-sm text-gray-500 pt-5 border-t border-gray-100 mt-5">
-              Don't have an account?{" "}
+              Don&apos;t have an account?{" "}
               <Link href="/register?redirect=/checkout/shipping" className="text-primary hover:underline font-semibold">
                 Create Account
               </Link>

@@ -24,8 +24,9 @@ export default function LoginPage() {
     try {
       await login({ email, password });
       router.push("/cart");
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to log in.");
+    } catch (err) {
+      const error = err as { response?: { data?: { message?: string } } };
+      setError(error.response?.data?.message || "Failed to log in.");
     } finally {
       setLoading(false);
     }
@@ -40,7 +41,7 @@ export default function LoginPage() {
           <div className="max-w-md mx-auto w-full">
             <h1 className="text-4xl font-bold text-primary mb-2">Log In</h1>
             <p className="text-gray-500 mb-10">
-              Welcome back to FIND. Let's continue your wonderful journey.
+              Welcome back to FIND. Let&apos;s continue your wonderful journey.
             </p>
 
             <form onSubmit={handleSubmit} className="space-y-6">
@@ -110,7 +111,7 @@ export default function LoginPage() {
               </div>
 
               <p className="text-sm text-gray-600 font-medium text-center mt-6">
-                Don't have an account?{" "}
+                Don&apos;t have an account?{" "}
                 <Link href="/register" className="text-gray-900 font-bold hover:text-primary transition-colors">
                   Sign up.
                 </Link>

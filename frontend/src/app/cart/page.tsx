@@ -239,6 +239,22 @@ export default function CartPage() {
             </span>
           </div>
 
+          {!isLoadingPrices && total > 0 && (
+            <div className="mb-6 min-h-[60px]">
+              <alya-placement
+                key={`cart-page-${total}`}
+                price={total}
+                currency="MAD"
+                lang="fr"
+                installments="4"
+                variant="interactive"
+                theme="light-plain"
+                detail="panel"
+                logo-position="left"
+              />
+            </div>
+          )}
+
           <motion.button 
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}

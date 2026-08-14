@@ -10,8 +10,8 @@ interface SidebarFilterProps {
   priceRange: { min: number; max: number };
   selectedFilters: Record<string, (string | number)[]>;
   onFilterChange: (slug: string, value: string | number) => void;
-  selectedMaxPrice: number;
-  onPriceChange: (value: number) => void;
+  selectedPriceRange: { min: number; max: number };
+  onPriceChange: (value: { min: number; max: number }) => void;
   inStockOnly: boolean;
   onInStockChange: (val: boolean) => void;
 }
@@ -21,7 +21,7 @@ export default function SidebarFilter({
   priceRange,
   selectedFilters,
   onFilterChange,
-  selectedMaxPrice,
+  selectedPriceRange,
   onPriceChange,
   inStockOnly,
   onInStockChange,
@@ -30,22 +30,53 @@ export default function SidebarFilter({
     <div className="w-full">
       <h2 className="text-lg font-bold text-gray-900 mb-6">Filters</h2>
 
-      {/* Price Slider */}
+      {/* Price Range */}
       {priceRange.max > priceRange.min && (
-        <div className="mb-8">
-          <h3 className="text-xs font-semibold tracking-wider text-gray-500 uppercase mb-4">Price</h3>
-          <input
-            type="range"
-            min={priceRange.min}
-            max={priceRange.max}
-            step={1}
-            value={selectedMaxPrice}
-            onChange={(e) => onPriceChange(Number(e.target.value))}
-            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-gray-900"
-          />
-          <div className="flex justify-between text-sm text-gray-500 mt-2">
-            <span>{formatPrice(priceRange.min)} MAD</span>
-            <span>{formatPrice(selectedMaxPrice)} MAD</span>
+        <div className="mb-8 p-4 bg-gray-50/50 rounded-xl">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-[15px] font-semibold text-gray-900">Gamme de prix</h3>
+            <ChevronUp className="w-4 h-4 text-gray-500" />
+          </div>
+          
+          <div className="relative w-full h-6 flex items-center mb-6">
+            {/* Track Background */}
+            <div className="absolute w-full h-[3px] bg-gray-200 rounded-full" />
+            {/* Active Track */}
+            <div 
+              className="absolute h-[3px] bg-[#002366] rounded-full"
+              style={{ 
+                left: `${((selectedPriceRange.min - priceRange.min) / (priceRange.max - priceRange.min)) * 100}%`, 
+                right: `${100 - ((selectedPriceRange.max - priceRange.min) / (priceRange.max - priceRange.min)) * 100}%` 
+              }}
+            />
+            {/* Min Slider */}
+            <input
+              type="range"
+              min={priceRange.min}
+              max={priceRange.max}
+              value={selectedPriceRange.min}
+              onChange={(e) => {
+                const val = Math.min(Number(e.target.value), selectedPriceRange.max - (priceRange.max - priceRange.min) * 0.05);
+                onPriceChange({ ...selectedPriceRange, min: val });
+              }}
+              className="absolute w-full h-full pointer-events-none dual-slider-thumb z-20"
+            />
+            {/* Max Slider */}
+            <input
+              type="range"
+              min={priceRange.min}
+              max={priceRange.max}
+              value={selectedPriceRange.max}
+              onChange={(e) => {
+                const val = Math.max(Number(e.target.value), selectedPriceRange.min + (priceRange.max - priceRange.min) * 0.05);
+                onPriceChange({ ...selectedPriceRange, max: val });
+              }}
+              className="absolute w-full h-full pointer-events-none dual-slider-thumb z-20"
+            />
+          </div>
+          <div className="flex justify-between text-[15px] text-gray-500">
+            <span>{formatPrice(selectedPriceRange.min)} <span className="text-xs">DH</span></span>
+            <span>{formatPrice(selectedPriceRange.max)} <span className="text-xs">DH</span></span>
           </div>
         </div>
       )}
