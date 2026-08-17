@@ -18,7 +18,7 @@ class CheckoutController extends Controller
 
     public function initiateCheckout(Request $request)
     {
-        \Illuminate\Support\Facades\Log::info('Hit checkout endpoint', ['items' => $request->input('items', [])]);
+        \Illuminate\Support\Facades\Log::info('Hit checkout endpoint');
         try {
             $validated = $request->validate([
                 'items' => 'required|array|min:1',
@@ -74,5 +74,20 @@ class CheckoutController extends Controller
         }
 
         return response()->json($order);
+    }
+
+    public function getUserOrders(Request $request)
+    {
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['error' => 'Unauthorized'], 401);
+        }
+
+        $orders = Order::with(['items.productVariant.product.images', 'payments'])
+                       ->where('user_id', $user->id)
+                       ->orderBy('created_at', 'desc')
+                       ->get();
+
+        return response()->json($orders);
     }
 }

@@ -11,6 +11,8 @@ class ProductController extends Controller
 {
     public function index()
     {
+        $perPage = request()->input('per_page', 12);
+        
         $products = QueryBuilder::for(Product::class)
             ->allowedFilters([
                 'brand',
@@ -24,7 +26,7 @@ class ProductController extends Controller
             ->allowedIncludes(['variants', 'images', 'category'])
             ->with(['variants', 'images', 'category'])
             ->where('status', 'active')
-            ->paginate(12);
+            ->paginate($perPage);
 
         return response()->json($products);
     }
@@ -83,7 +85,9 @@ class ProductController extends Controller
         $products = Product::where('status', 'active')
             ->where(function ($q) use ($query) {
                 $q->where('name', 'LIKE', "%{$query}%")
-                  ->orWhere('brand', 'LIKE', "%{$query}%");
+                  ->orWhereHas('brand', function($b) use ($query) {
+                      $b->where('name', 'LIKE', "%{$query}%");
+                  });
             })
             ->with(['images' => function ($q) {
                 $q->orderBy('sort_order')->limit(1);

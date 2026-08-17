@@ -11,9 +11,18 @@ Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
 
+Route::post('/admin/login', [AuthController::class, 'adminLogin']);
+Route::post('/admin/logout', [AuthController::class, 'adminLogout'])->middleware('auth:sanctum');
+
 Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/user/orders', [App\Http\Controllers\Api\CheckoutController::class, 'getUserOrders']);
+    Route::put('/user/profile', [AuthController::class, 'updateProfile']);
+    Route::put('/user/password', [AuthController::class, 'updatePassword']);
+});
 
 Route::get('/categories', [CategoryController::class, 'index']);
 Route::get('/categories/{slug}', [CategoryController::class, 'show']);
@@ -39,6 +48,7 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::get('/dashboard', [AdminController::class, 'getDashboard']);
     Route::get('/orders', [AdminController::class, 'getOrders']);
     Route::get('/orders/{id}', [AdminController::class, 'getOrder']);
+    Route::delete('/orders/{id}', [AdminController::class, 'deleteOrder']);
     Route::get('/payments', [AdminController::class, 'getPayments']);
     Route::put('/orders/{id}/status', [AdminController::class, 'updateOrderStatus']);
     
@@ -65,4 +75,7 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::post('/products/configurations/{configId}/images', [\App\Http\Controllers\Api\Admin\ProductController::class, 'uploadImage']);
     Route::delete('/products/images/{imageId}', [\App\Http\Controllers\Api\Admin\ProductController::class, 'deleteImage']);
     Route::put('/products/configurations/{configId}/images/reorder', [\App\Http\Controllers\Api\Admin\ProductController::class, 'reorderImages']);
+    // Profile
+    Route::get('/profile', [\App\Http\Controllers\Api\Admin\ProfileController::class, 'getProfile']);
+    Route::post('/profile', [\App\Http\Controllers\Api\Admin\ProfileController::class, 'updateProfile']);
 });

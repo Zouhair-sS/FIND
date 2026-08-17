@@ -17,6 +17,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'api/checkout',
             'api/verify-payment',
             'api/webhooks/alyapay',
+            'api/admin/*',
         ]);
         $middleware->alias([
             'admin' => \App\Http\Middleware\AdminMiddleware::class,

@@ -329,6 +329,7 @@ class ProductController extends Controller
             'screen_size' => 'nullable|numeric',
             'color' => 'nullable|string',
             'processor' => 'nullable|string',
+            'product_image_id' => 'nullable|exists:product_images,id',
         ]);
 
         $variant = $config->variants()->create($validated);
@@ -350,6 +351,7 @@ class ProductController extends Controller
             'screen_size' => 'nullable|numeric',
             'color' => 'nullable|string',
             'processor' => 'nullable|string',
+            'product_image_id' => 'nullable|exists:product_images,id',
         ]);
 
         $variant->update($validated);

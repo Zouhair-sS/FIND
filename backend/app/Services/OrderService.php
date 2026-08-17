@@ -27,11 +27,16 @@ class OrderService
             $orderItemsData = [];
 
             foreach ($items as $item) {
-                $variant = ProductVariant::with('product')->findOrFail($item['product_variant_id']);
+                // Lock the variant row to prevent race conditions during checkout
+                $variant = ProductVariant::with('product')->lockForUpdate()->findOrFail($item['product_variant_id']);
                 
                 $quantity = (int) $item['quantity'];
                 if ($quantity <= 0) {
                     throw new Exception('Quantity must be greater than zero.');
+                }
+
+                if ($variant->stock_quantity < $quantity) {
+                    throw new Exception("Insufficient stock for {$variant->product->name} (SKU: {$variant->sku}). Requested: {$quantity}, Available: {$variant->stock_quantity}");
                 }
 
                 $price = $variant->price;
@@ -42,6 +47,14 @@ class OrderService
                     'quantity' => $quantity,
                     'unit_price' => $price,
                 ];
+
+                // Decrement stock immediately on the variant
+                $variant->stock_quantity -= $quantity;
+                $variant->save();
+
+                // Recalculate total stock for the parent product
+                $variant->product->stock = $variant->product->variants()->sum('stock_quantity');
+                $variant->product->save();
             }
 
             $shippingCost = $data['shipping_cost'] ?? 0.00;
@@ -50,7 +63,7 @@ class OrderService
             $vendorReference = $orderNumber; // They are the same per our design
 
             $order = Order::create([
-                'user_id' => auth()->id(), // Nullable for guests
+                'user_id' => auth('sanctum')->id(), // Nullable for guests
                 'order_number' => $orderNumber,
                 'vendor_reference' => $vendorReference,
                 'status' => 'pending_payment',
@@ -80,8 +93,9 @@ class OrderService
     private function generateOrderNumber(): string
     {
         do {
-            // E.g. FIND-ORD-20260810-XXXX
-            $number = 'FIND-ORD-' . date('Ymd') . '-' . strtoupper(Str::random(4));
+            // E.g. FIND-ORD-20260810-12A4B89F3C
+            // Generate 10 random characters (approx 3.6 trillion combinations) instead of 4
+            $number = 'FIND-ORD-' . date('Ymd') . '-' . strtoupper(Str::random(10));
         } while (Order::where('order_number', $number)->exists());
 
         return $number;

@@ -13,9 +13,9 @@ class MetadataController extends Controller
     public function getMetadata()
     {
         return response()->json([
-            'categories' => Category::select('id', 'name')->get(),
+            'categories' => Category::with('children')->select('id', 'name', 'parent_id')->get(),
             'brands' => Brand::select('id', 'name')->get(),
-            'series' => Series::select('id', 'name', 'brand_id')->get(),
+            'series' => Series::select('id', 'name', 'brand_id', 'category_id')->get(),
         ]);
     }
 }

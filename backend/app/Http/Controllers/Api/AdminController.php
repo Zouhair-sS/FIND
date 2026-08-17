@@ -76,9 +76,9 @@ class AdminController extends Controller
             'recent_orders' => $recentOrders,
         ]);
     }
-    public function getOrders()
+    public function getOrders(Request $request)
     {
-        $orders = Order::with('payments')->orderBy('created_at', 'desc')->paginate(50);
+        $orders = Order::with(['payments', 'user'])->orderBy('created_at', 'desc')->paginate(50);
         return response()->json($orders);
     }
 
@@ -114,5 +114,22 @@ class AdminController extends Controller
         ]);
 
         return response()->json($order->load('statusHistory'));
+    }
+
+    public function deleteOrder($id)
+    {
+        $order = Order::findOrFail($id);
+
+        if ($order->payment_status !== 'unpaid' && $order->payment_status !== 'failed') {
+            return response()->json(['message' => 'Only unpaid or failed orders can be deleted.'], 400);
+        }
+
+        // Delete associated payments and status history
+        $order->payments()->delete();
+        $order->statusHistory()->delete();
+        $order->items()->delete();
+        $order->delete();
+
+        return response()->json(['message' => 'Order deleted successfully.']);
     }
 }
