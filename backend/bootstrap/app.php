@@ -18,6 +18,9 @@ return Application::configure(basePath: dirname(__DIR__))
             'api/verify-payment',
             'api/webhooks/alyapay',
         ]);
+        $middleware->alias([
+            'admin' => \App\Http\Middleware\AdminMiddleware::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

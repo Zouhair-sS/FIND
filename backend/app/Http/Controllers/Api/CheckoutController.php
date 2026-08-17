@@ -18,7 +18,7 @@ class CheckoutController extends Controller
 
     public function initiateCheckout(Request $request)
     {
-        \Illuminate\Support\Facades\Log::info('Hit checkout endpoint', $request->all());
+        \Illuminate\Support\Facades\Log::info('Hit checkout endpoint', ['items' => $request->input('items', [])]);
         try {
             $validated = $request->validate([
                 'items' => 'required|array|min:1',

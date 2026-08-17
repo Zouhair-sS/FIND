@@ -27,8 +27,7 @@ class AlyaPayService
             'X-API-Key' => $this->apiKey, // Passing both to ensure compatibility
             'Accept' => 'application/json',
             'Content-Type' => 'application/json',
-        ])->baseUrl($this->baseUrl)
-          ->retry(3, 200);
+        ])->baseUrl($this->baseUrl);
     }
 
     /**

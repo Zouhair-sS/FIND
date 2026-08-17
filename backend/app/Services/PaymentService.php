@@ -57,7 +57,8 @@ class PaymentService
             'status' => strtolower($transactionResponse['status'] ?? 'pending'),
             'amount' => $order->total_amount,
             'currency' => $order->currency,
-            'raw_response' => json_encode($transactionResponse),
+            'environment' => config('alyapay.environment', 'sandbox'),
+            'raw_response' => $transactionResponse,
         ]);
 
         // 5. Generate Checkout Link
@@ -103,30 +104,46 @@ class PaymentService
      */
     public function handleWebhook(array $payload, string $eventId)
     {
-        $vendorReference = $payload['data']['vendorReference'] ?? null;
+        $transactionId = $payload['data']['id'] ?? null;
         $status = strtolower($payload['data']['status'] ?? '');
 
-        if (!$vendorReference) {
-            throw new Exception('Webhook missing vendorReference');
+        if (!$transactionId) {
+            Log::error('Webhook missing critical identifiers', ['payload' => $payload]);
+            return false;
         }
 
-        // Idempotency check
+        // Strict Idempotency
         if (Payment::where('webhook_event_id', $eventId)->exists()) {
-            return true; // Already processed
+            return true;
         }
 
-        $order = Order::where('vendor_reference', $vendorReference)->first();
-        if (!$order) {
-            Log::warning("Webhook received for unknown order: $vendorReference");
-            return false;
-        }
-
-        $payment = Payment::where('vendor_reference', $vendorReference)->latest()->first();
+        $payment = Payment::where('alyapay_transaction_id', $transactionId)->first();
         if (!$payment) {
+            Log::error("Webhook for unknown transaction ID: $transactionId");
             return false;
         }
 
-        $this->processStatusUpdate($order, $payment, $status, $payload, $eventId);
+        // 1. Terminal Status Immutability
+        $terminalStatuses = ['approved', 'paid', 'failed', 'canceled', 'expired'];
+        if (in_array($payment->status, $terminalStatuses)) {
+            Log::info("Ignored webhook for terminal status: {$payment->status} on transaction $transactionId");
+            return true;
+        }
+
+        // 2. Forward Progress (A terminal status always overrides a pre-terminal one)
+        if (in_array($status, $terminalStatuses)) {
+            $this->processStatusUpdate($payment->order, $payment, $status, $payload, $eventId);
+            return true;
+        }
+
+        // 3. Out-of-order event protection (For pre-terminal statuses only)
+        $preTerminalWeight = ['pending' => 1, 'awaiting_capture' => 2];
+        
+        if (($preTerminalWeight[$status] ?? 0) < ($preTerminalWeight[$payment->status] ?? 0)) {
+            return true; // Ignore older status
+        }
+
+        $this->processStatusUpdate($payment->order, $payment, $status, $payload, $eventId);
         return true;
     }
 
@@ -136,7 +153,7 @@ class PaymentService
             'status' => $status,
             'webhook_event_id' => $eventId ?? $payment->webhook_event_id,
             'verified_at' => now(),
-            'raw_response' => json_encode($rawResponse)
+            'raw_response' => $rawResponse
         ]);
 
         if ($status === 'approved') {

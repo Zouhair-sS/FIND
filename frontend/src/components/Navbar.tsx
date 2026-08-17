@@ -3,9 +3,9 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 
-import type { Product } from "@/lib/api";
+import { getImageUrl, type Product } from "@/lib/api";
 import { useCart } from "./CartContext";
 import { useAuth } from "@/components/AuthContext";
 import { formatPrice } from "@/lib/formatPrice";
@@ -34,12 +34,17 @@ export default function Navbar() {
   const searchRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+  const pathname = usePathname();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [placeholderText, setPlaceholderText] = useState("");
   const [phIndex, setPhIndex] = useState(0);
   const [phCharIndex, setPhCharIndex] = useState(0);
   const [phIsDeleting, setPhIsDeleting] = useState(false);
+
+  if (pathname?.startsWith("/admin")) {
+    return null;
+  }
 
   useEffect(() => {
     if (!searchOpen) return;
@@ -225,7 +230,7 @@ export default function Navbar() {
 
             {/* Desktop Search Results Dropdown */}
             {searchOpen && (searchQuery.trim().length > 0 || isSearching) && (
-              <div className="absolute top-full right-0 mt-3 w-[650px] bg-white rounded-xl shadow-xl shadow-gray-200/50 border border-gray-200 overflow-hidden z-[60]">
+              <div className="absolute top-full right-0 mt-3 w-[650px] bg-white/70 backdrop-blur-2xl rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-white/60 overflow-hidden z-[60]">
                 {isSearching ? (
                   <div className="p-12 text-center text-gray-500 flex flex-col items-center gap-3">
                     <div className="inline-block w-6 h-6 border-2 border-gray-200 border-t-[#002366] rounded-full animate-spin" />
@@ -236,7 +241,7 @@ export default function Navbar() {
                     <div className="max-h-[450px] overflow-y-auto p-2">
                       <div className="grid grid-cols-2 gap-x-2 gap-y-1">
                         {searchResults.slice(0, 6).map((product) => {
-                          const firstImage = product.images?.[0];
+                          const displayImageUrl = product.thumbnail || product.images?.[0]?.url;
                           const firstVariant = product.variants?.[0];
                           const price = firstVariant ? parseFloat(firstVariant.price) : 0;
                           
@@ -254,13 +259,13 @@ export default function Navbar() {
                             <button
                               key={product.id}
                               onClick={() => handleResultClick(product)}
-                              className="w-full flex items-center gap-4 p-3 hover:bg-gray-50 transition-colors text-left rounded-lg"
+                              className="w-full flex items-center gap-4 p-3 hover:bg-black/5 transition-colors text-left rounded-xl"
                             >
                               {/* Product image */}
-                              <div className="relative w-16 h-16 bg-white flex-shrink-0 flex items-center justify-center">
-                                {firstImage ? (
+                              <div className="relative w-16 h-16 bg-white/60 rounded-lg shadow-sm border border-white/50 flex-shrink-0 flex items-center justify-center overflow-hidden">
+                                {displayImageUrl ? (
                                   <Image
-                                    src={firstImage.url}
+                                    src={getImageUrl(displayImageUrl)}
                                     alt={product.name}
                                     fill
                                     className="object-contain p-1 mix-blend-multiply"
@@ -293,7 +298,7 @@ export default function Navbar() {
                       </div>
                     </div>
                     {searchResults.length > 0 && (
-                      <div className="p-3 bg-white border-t border-gray-100">
+                      <div className="p-3 bg-black/[0.02] border-t border-black/[0.05]">
                         <button
                           onClick={() => {
                             setSearchOpen(false);
@@ -330,7 +335,7 @@ export default function Navbar() {
             </button>
 
             {userMenuOpen && (
-              <div className="absolute top-full right-0 mt-3 w-48 bg-white rounded-2xl shadow-xl shadow-primary/5 border border-gray-100 py-2 z-[60]">
+              <div className="absolute top-full right-0 mt-3 w-48 bg-white/70 backdrop-blur-2xl rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-white/60 py-2 z-[60]">
                 {isAuthenticated ? (
                   <>
                     <div className="px-4 py-3 border-b border-gray-100 mb-1">
@@ -423,7 +428,7 @@ export default function Navbar() {
                 ) : searchResults.length > 0 ? (
                   <div className="max-h-[300px] overflow-y-auto">
                     {searchResults.map((product) => {
-                      const firstImage = product.images?.[0];
+                      const displayImageUrl = product.thumbnail || product.images?.[0]?.url;
                       return (
                         <button
                           key={product.id}
@@ -434,9 +439,9 @@ export default function Navbar() {
                           className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-gray-100 transition-colors text-left"
                         >
                           <div className="relative w-10 h-10 bg-white rounded-md flex-shrink-0 overflow-hidden">
-                            {firstImage ? (
+                            {displayImageUrl ? (
                               <Image
-                                src={firstImage.url}
+                                src={getImageUrl(displayImageUrl)}
                                 alt={product.name}
                                 fill
                                 className="object-contain p-0.5"

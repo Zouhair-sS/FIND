@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Outfit } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
 import { CartProvider } from "@/components/CartContext";
 import { AuthProvider } from "@/components/AuthContext";
 import CartDrawer from "@/components/CartDrawer";
@@ -33,7 +32,6 @@ export default function RootLayout({
             <main className="min-h-screen flex flex-col">
               <PageTransition>{children}</PageTransition>
             </main>
-            <Footer />
             <CartDrawer />
           </CartProvider>
         </AuthProvider>

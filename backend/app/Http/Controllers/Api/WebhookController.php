@@ -22,31 +22,39 @@ class WebhookController extends Controller
         $secret = config('alyapay.webhook_secret');
         
         // If secret is configured, enforce signature verification
-        if ($secret) {
-            $timestamp = $request->header('x-alya-timestamp');
-            $receivedSig = $request->header('x-alya-signature');
-            $rawBody = $request->getContent(); // Raw payload
+        if (!$secret) {
+            Log::error('AlyaPay webhook secret is missing in configuration.');
+            return response('Webhook secret unconfigured', 401);
+        }
 
-            if (!$timestamp || !$receivedSig) {
-                Log::warning('AlyaPay webhook missing signature headers');
-                return response('Missing headers', 400);
-            }
+        $timestamp = $request->header('x-alya-timestamp');
+        $receivedSig = $request->header('x-alya-signature');
+        $rawBody = $request->getContent(); // Raw payload
 
-            $expectedHMAC = hash_hmac('sha256', $timestamp . '.' . $rawBody, $secret);
-            $expectedSig = 'sha256=' . $expectedHMAC;
+        if (!$timestamp || !$receivedSig) {
+            Log::warning('AlyaPay webhook missing signature headers');
+            return response('Missing headers', 401);
+        }
 
-            if (!hash_equals($expectedSig, $receivedSig)) {
-                Log::warning('AlyaPay webhook signature mismatch', [
-                    'received' => $receivedSig, 
-                    'expected' => $expectedSig
-                ]);
-                return response('Invalid signature', 401);
-            }
+        $expectedHMAC = hash_hmac('sha256', $timestamp . '.' . $rawBody, $secret);
+        $expectedSig = 'sha256=' . $expectedHMAC;
+
+        if (!hash_equals($expectedSig, $receivedSig)) {
+            Log::warning('AlyaPay webhook signature mismatch', [
+                'received' => $receivedSig, 
+                'expected' => $expectedSig
+            ]);
+            return response('Invalid signature', 401);
         }
 
         // 2. Process payload
-        $eventId = $request->header('x-alya-event-id', 'unknown-' . uniqid());
         $payload = $request->json()->all();
+        
+        $transactionId = $payload['data']['id'] ?? 'unknown';
+        $status = $payload['data']['status'] ?? 'unknown';
+        $amount = $payload['data']['amount'] ?? '0';
+
+        $eventId = $request->header('x-alya-event-id', hash('sha256', $transactionId . $status . $amount));
 
         try {
             $this->paymentService->handleWebhook($payload, $eventId);

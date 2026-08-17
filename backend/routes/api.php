@@ -32,3 +32,37 @@ Route::post('/verify-payment', [CheckoutController::class, 'verifyPayment']);
 Route::get('/orders/{orderNumber}', [CheckoutController::class, 'getOrder']);
 
 Route::post('/webhooks/alyapay', [WebhookController::class, 'handleAlyaPay']);
+
+use App\Http\Controllers\Api\AdminController;
+
+Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function () {
+    Route::get('/dashboard', [AdminController::class, 'getDashboard']);
+    Route::get('/orders', [AdminController::class, 'getOrders']);
+    Route::get('/orders/{id}', [AdminController::class, 'getOrder']);
+    Route::get('/payments', [AdminController::class, 'getPayments']);
+    Route::put('/orders/{id}/status', [AdminController::class, 'updateOrderStatus']);
+    
+    // Metadata
+    Route::get('/metadata', [\App\Http\Controllers\Api\Admin\MetadataController::class, 'getMetadata']);
+
+    // Products (grouped by storefront identity)
+    Route::get('/products', [\App\Http\Controllers\Api\Admin\ProductController::class, 'index']);
+    Route::post('/products', [\App\Http\Controllers\Api\Admin\ProductController::class, 'store']);
+    Route::get('/products/{id}', [\App\Http\Controllers\Api\Admin\ProductController::class, 'show']);
+    Route::put('/products/{id}', [\App\Http\Controllers\Api\Admin\ProductController::class, 'update']);
+    Route::delete('/products/{id}', [\App\Http\Controllers\Api\Admin\ProductController::class, 'destroy']);
+
+    // Configurations (within a product group)
+    Route::post('/products/{id}/configurations', [\App\Http\Controllers\Api\Admin\ProductController::class, 'addConfiguration']);
+    Route::delete('/products/configurations/{configId}', [\App\Http\Controllers\Api\Admin\ProductController::class, 'deleteConfiguration']);
+
+    // Variants (per-configuration)
+    Route::post('/products/configurations/{configId}/variants', [\App\Http\Controllers\Api\Admin\ProductController::class, 'storeVariant']);
+    Route::put('/products/variants/{variantId}', [\App\Http\Controllers\Api\Admin\ProductController::class, 'updateVariant']);
+    Route::delete('/products/variants/{variantId}', [\App\Http\Controllers\Api\Admin\ProductController::class, 'destroyVariant']);
+
+    // Images (per-configuration)
+    Route::post('/products/configurations/{configId}/images', [\App\Http\Controllers\Api\Admin\ProductController::class, 'uploadImage']);
+    Route::delete('/products/images/{imageId}', [\App\Http\Controllers\Api\Admin\ProductController::class, 'deleteImage']);
+    Route::put('/products/configurations/{configId}/images/reorder', [\App\Http\Controllers\Api\Admin\ProductController::class, 'reorderImages']);
+});

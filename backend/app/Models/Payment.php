@@ -14,6 +14,7 @@ class Payment extends Model
 
     protected $casts = [
         'verified_at' => 'datetime',
+        'raw_response' => 'array',
     ];
 
     public function order()

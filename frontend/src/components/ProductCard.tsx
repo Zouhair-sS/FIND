@@ -7,6 +7,7 @@ import Image from "next/image";
 import { useState } from "react";
 import type { Product } from "@/lib/api";
 import { formatPrice } from "@/lib/formatPrice";
+import { getImageUrl } from "@/lib/api";
 
 const COLOR_MAP: Record<string, string> = {
   "Midnight": "#1c1f24",
@@ -73,16 +74,21 @@ const PROCESSOR_BADGES: Record<string, string> = {
   "Core i9": "/images/LOGOS/processors/core i9.webp",
 };
 
-const getScaleClass = (brand?: string | null, categorySlug?: string | null) => {
+const getScaleClass = (brand?: string | null, categorySlug?: string | null, productName?: string) => {
   if (categorySlug === 'laptops') {
-    if (brand?.toLowerCase() === 'apple') return 'scale-[1.35] group-hover:scale-[1.4]';
+    if (brand?.toLowerCase() === 'apple') return 'scale-[1.15] group-hover:scale-[1.2]';
     return 'scale-[0.95] group-hover:scale-100';
   }
   if (categorySlug === 'smartphones') {
-    if (brand?.toLowerCase() === 'google' || brand?.toLowerCase() === 'samsung') {
-      return 'scale-[1.6] group-hover:scale-[1.65]';
+    if (brand?.toLowerCase() === 'apple') return 'scale-[0.85] group-hover:scale-90';
+    if (brand?.toLowerCase() === 'samsung') {
+      if (productName?.toLowerCase().includes('ultra')) return 'scale-[1.15] group-hover:scale-[1.2]';
+      return 'scale-[1.1] group-hover:scale-[1.15]';
     }
-    return 'scale-100 group-hover:scale-105';
+    if (brand?.toLowerCase() === 'google') {
+      return 'scale-[1.1] group-hover:scale-[1.15]';
+    }
+    return 'scale-[0.9] group-hover:scale-[0.95]';
   }
   return 'scale-100 group-hover:scale-105';
 };
@@ -145,7 +151,7 @@ export default function ProductCard({
 
   const [selectedColor, setSelectedColor] = useState<string | null>(initialColor);
 
-  let displayImageUrl = product.images?.[0]?.url;
+  let displayImageUrl = product.thumbnail || product.images?.[0]?.url;
   if (selectedColor && product.images) {
     const selectedTokens = selectedColor.toLowerCase().split(' ');
     let bestMatch = null;
@@ -199,11 +205,13 @@ export default function ProductCard({
           {/* Product Image */}
           {displayImageUrl ? (
             <Image
-              src={displayImageUrl}
+              unoptimized
+              src={getImageUrl(displayImageUrl)}
               alt={product.name}
               fill
-              className={`object-contain p-8 transition-transform duration-300 ${getScaleClass(product.brand?.name, product.category?.slug)}`}
-              sizes="(max-width: 768px) 50vw, 25vw"
+              className={`object-contain p-4 transition-transform duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)] mix-blend-multiply ${getScaleClass(product.brand?.name, product.category?.slug, product.name)}`}
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+              priority
             />
           ) : (
             <div className="text-gray-300">

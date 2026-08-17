@@ -6,9 +6,10 @@ import { useMemo, useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import type { Product } from "@/lib/api";
+import type { Product, ProductVariant, ProductImage } from "@/lib/api";
 import { useCart } from "./CartContext";
 import { formatPrice } from "@/lib/formatPrice";
+import { getImageUrl } from "@/lib/api";
 
 const COLOR_MAP: Record<string, string> = {
   "Midnight": "#1c1f24",
@@ -224,7 +225,8 @@ export default function ProductDetailClient({ product }: { product: Product }) {
                   className="absolute inset-0 flex items-center justify-center pointer-events-none"
                 >
                   <Image
-                    src={images[selectedImageIdx].url}
+                    unoptimized
+                    src={getImageUrl(images[selectedImageIdx].url)}
                     alt={product.name}
                     fill
                     className={`object-contain p-8 ${getScaleClass(product.brand?.name, product.category?.slug)}`}
@@ -284,7 +286,7 @@ export default function ProductDetailClient({ product }: { product: Product }) {
                     idx === selectedImageIdx ? "border-gray-900" : "border-gray-100 hover:border-gray-300"
                   }`}
                 >
-                  <Image src={img.url} alt="" fill className="object-contain p-1" sizes="64px" />
+                  <Image unoptimized src={getImageUrl(img.url)} alt="" fill className="object-contain p-1" sizes="64px" />
                 </button>
               ))}
             </div>
@@ -323,7 +325,7 @@ export default function ProductDetailClient({ product }: { product: Product }) {
               <h4 className="text-xs font-semibold tracking-wider text-gray-500 uppercase mb-3">Color</h4>
               <div className="flex flex-col gap-2">
                 {colors.map((color) => {
-                  const hex = COLOR_MAP[color] || "#cccccc";
+                  const hex = color.startsWith('#') ? color : (COLOR_MAP[color] || "#cccccc");
                   const isSelected = selectedColor === color;
                   
                   // Find if this color is in stock

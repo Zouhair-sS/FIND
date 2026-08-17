@@ -87,25 +87,25 @@ export default function HomeClient({ products, categories }: { products: any, ca
       <section className="relative min-h-[90vh] flex items-center justify-center overflow-hidden bg-gray-50 border-b border-gray-100">
         {/* Abstract Background Elements */}
         <div className="absolute inset-0 z-0 opacity-40">
-          <motion.div 
-            animate={{ scale: [1, 1.1, 1], x: [0, 20, 0], y: [0, -20, 0] }} 
-            transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }} 
+          <motion.div
+            animate={{ scale: [1, 1.1, 1], x: [0, 20, 0], y: [0, -20, 0] }}
+            transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
             className="absolute top-[-10%] right-[-5%] w-96 h-96 bg-blue-200 rounded-full mix-blend-multiply filter blur-3xl opacity-70"
           ></motion.div>
-          <motion.div 
-            animate={{ scale: [1, 1.2, 1], x: [0, -30, 0], y: [0, 20, 0] }} 
-            transition={{ duration: 8, repeat: Infinity, ease: "easeInOut", delay: 2 }} 
+          <motion.div
+            animate={{ scale: [1, 1.2, 1], x: [0, -30, 0], y: [0, 20, 0] }}
+            transition={{ duration: 8, repeat: Infinity, ease: "easeInOut", delay: 2 }}
             className="absolute bottom-[-10%] left-[-5%] w-96 h-96 bg-indigo-200 rounded-full mix-blend-multiply filter blur-3xl opacity-70"
           ></motion.div>
-          <motion.div 
-            animate={{ scale: [1, 1.1, 1], x: [0, 20, 0], y: [0, 20, 0] }} 
-            transition={{ duration: 9, repeat: Infinity, ease: "easeInOut", delay: 4 }} 
+          <motion.div
+            animate={{ scale: [1, 1.1, 1], x: [0, 20, 0], y: [0, 20, 0] }}
+            transition={{ duration: 9, repeat: Infinity, ease: "easeInOut", delay: 4 }}
             className="absolute bottom-[20%] right-[20%] w-96 h-96 bg-purple-200 rounded-full mix-blend-multiply filter blur-3xl opacity-70"
           ></motion.div>
         </div>
 
         <div className="max-w-7xl mx-auto px-6 w-full z-10 grid md:grid-cols-2 gap-12 items-center pt-20 pb-16">
-          <motion.div 
+          <motion.div
             initial="hidden"
             animate="visible"
             variants={staggerContainer}
@@ -118,13 +118,13 @@ export default function HomeClient({ products, categories }: { products: any, ca
               </span>
               Live AlyaPay Demo Store
             </motion.div>
-            
+
             <motion.h1 variants={fadeInUp} className="text-5xl md:text-7xl font-bold tracking-tight text-gray-900 leading-[1.1]">
-              BUY THE TECH <br className="hidden md:block"/>YOU LOVE. <br/>
+              BUY THE TECH <br className="hidden md:block" />YOU LOVE. <br />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600 mt-2 block md:inline">
-                PAY SMARTER 
+                PAY SMARTER
               </span>
-              <br className="hidden md:block"/>
+              <br className="hidden md:block" />
               <span className="inline-flex items-center gap-x-4 lg:gap-x-5 mt-1 md:mt-2">
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">
                   WITH
@@ -132,11 +132,11 @@ export default function HomeClient({ products, categories }: { products: any, ca
                 <Image src="/images/AlyaPay Icon/alyaIcon-dark.svg" alt="AlyaPay" width={220} height={60} className="h-[0.75em] w-auto object-contain translate-y-1.5 ml-1" />
               </span>
             </motion.h1>
-            
+
             <motion.p variants={fadeInUp} className="text-lg md:text-xl text-gray-600 max-w-lg leading-relaxed">
               Experience a real e-commerce journey powered by AlyaPay. Discover premium products and see how frictionless checkout drives higher conversion.
             </motion.p>
-            
+
             <motion.div variants={fadeInUp} className="flex flex-col sm:flex-row gap-4 mt-4">
               <Link
                 href="/products"
@@ -155,33 +155,33 @@ export default function HomeClient({ products, categories }: { products: any, ca
             </motion.div>
           </motion.div>
 
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.8, delay: 0.2 }}
             className="relative w-full aspect-[4/3] md:aspect-square flex justify-center items-center"
           >
             <div className="relative w-full h-full max-w-lg max-h-lg rounded-2xl shadow-2xl bg-white border border-gray-100 p-4">
-               <AnimatePresence initial={false}>
-                 <motion.div
-                   key={heroImageIndex}
-                   initial={{ opacity: 0 }}
-                   animate={{ opacity: 1 }}
-                   exit={{ opacity: 0 }}
-                   transition={{ duration: 1, ease: "easeInOut" }}
-                   className="absolute inset-4 z-0 overflow-hidden rounded-xl"
-                 >
-                   <Image
-                     src={HERO_IMAGES[heroImageIndex]}
-                     alt="Premium Tech Ecosystem"
-                     fill
-                     className="object-cover"
-                     priority
-                   />
-                 </motion.div>
-               </AnimatePresence>
+              <AnimatePresence initial={false}>
+                <motion.div
+                  key={heroImageIndex}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 1, ease: "easeInOut" }}
+                  className="absolute inset-4 z-0 overflow-hidden rounded-xl"
+                >
+                  <Image
+                    src={HERO_IMAGES[heroImageIndex]}
+                    alt="Premium Tech Ecosystem"
+                    fill
+                    className="object-cover"
+                    priority
+                  />
+                </motion.div>
+              </AnimatePresence>
               {/* Floating Element to simulate AlyaPay payment success */}
-              <motion.div 
+              <motion.div
                 initial={{ x: -50, opacity: 0 }}
                 animate={{ x: 0, opacity: 1 }}
                 transition={{ delay: 1, duration: 0.6 }}
@@ -245,58 +245,14 @@ export default function HomeClient({ products, categories }: { products: any, ca
         </div>
       </section>
 
-      {/* 03 — HOW ALYAPAY FITS INTO IT */}
-      <section id="demo-flow" className="bg-gray-50 py-24">
-        <div className="max-w-7xl mx-auto px-6">
-          <motion.div 
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: "-100px" }}
-            variants={fadeInUp}
-            className="text-center mb-20"
-          >
-            <h2 className="text-sm font-bold text-gray-400 tracking-widest uppercase mb-3">01 / The Journey</h2>
-            <h3 className="text-3xl md:text-5xl font-bold text-gray-900 mb-6">How AlyaPay fits into the flow</h3>
-            <p className="text-gray-500 max-w-2xl mx-auto text-lg">A frictionless experience from discovery to payment. Here is exactly what your customers see when checking out with AlyaPay.</p>
-          </motion.div>
 
-          <div className="grid md:grid-cols-3 gap-12 relative">
-            {/* Connecting line for desktop */}
-            <div className="hidden md:block absolute top-[40%] left-[15%] right-[15%] h-px bg-gradient-to-r from-gray-50 via-blue-200 to-gray-50 -translate-y-1/2 z-0"></div>
-
-            {[
-              { title: "Discover", desc: "Customers browse your premium tech collection and add to cart.", img: "/images/UI/FROM PRODUCT TO PAYMENT ICONS/Browse Products.png", delay: 0 },
-              { title: "Seamless Checkout", desc: "No long forms. One-click initiation to the AlyaPay gateway.", img: "/images/UI/FROM PRODUCT TO PAYMENT ICONS/Complete checkout.png", delay: 0.2 },
-              { title: "Secure Payment", desc: "Transactions are processed safely in the AlyaPay environment.", img: "/images/UI/FROM PRODUCT TO PAYMENT ICONS/Experience AlyaPay.png", delay: 0.4 },
-            ].map((step, index) => (
-              <motion.div 
-                key={index}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-100px" }}
-                transition={{ duration: 0.6, delay: step.delay }}
-                className="relative z-10 flex flex-col items-center text-center group bg-white rounded-3xl p-8 shadow-xl shadow-gray-200/60 hover:-translate-y-2 transition-transform duration-300"
-              >
-                <div className="w-48 h-48 relative mb-6">
-                   <Image src={step.img} alt={step.title} fill className="object-cover rounded-2xl" />
-                   <div className="absolute -top-2 -right-2 w-8 h-8 rounded-full bg-gray-600 text-white flex items-center justify-center font-bold text-sm ring-4 ring-white shadow-sm z-10">
-                     {index + 1}
-                   </div>
-                </div>
-                <h4 className="text-xl font-bold text-gray-900 mb-3">{step.title}</h4>
-                <p className="text-gray-500 leading-relaxed text-sm">{step.desc}</p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
 
 
 
       {/* 05 — FEATURED PRODUCTS */}
       <section className="bg-gray-50/50 py-24">
         <div className="max-w-7xl mx-auto px-6">
-          <motion.div 
+          <motion.div
             initial="hidden"
             whileInView="visible"
             viewport={{ once: true, margin: "-100px" }}
@@ -313,7 +269,7 @@ export default function HomeClient({ products, categories }: { products: any, ca
           </motion.div>
 
           {featured.length > 0 ? (
-            <motion.div 
+            <motion.div
               initial="hidden"
               whileInView="visible"
               viewport={{ once: true, margin: "-100px" }}
@@ -333,7 +289,7 @@ export default function HomeClient({ products, categories }: { products: any, ca
               <code className="inline-block bg-gray-100 text-gray-800 px-4 py-2 rounded-lg text-sm">php artisan serve</code>
             </div>
           )}
-          
+
           <div className="mt-8 md:hidden text-center">
             <Link href="/products" className="inline-flex items-center gap-2 text-sm font-semibold text-blue-600 hover:text-blue-700 transition-colors">
               View full catalog <ArrowRight className="w-4 h-4" />
@@ -344,28 +300,32 @@ export default function HomeClient({ products, categories }: { products: any, ca
 
       {/* 06 — INTERACTIVE DEMO CTA */}
       <section id="start-demo" className="max-w-5xl mx-auto px-6 py-32">
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.95 }}
-          whileInView={{ opacity: 1, scale: 1 }}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-50px" }}
-          transition={{ duration: 0.8 }}
-          className="relative rounded-[2.5rem] overflow-hidden bg-white border border-blue-100 shadow-2xl shadow-blue-900/5 text-center py-20 px-8"
+          transition={{ duration: 0.5, ease: [0.23, 1, 0.32, 1] }}
+          className="relative rounded-[2rem] overflow-hidden bg-white border border-gray-200 shadow-[0_8px_40px_rgb(0,0,0,0.04)] text-center py-24 px-8"
         >
-          <div className="absolute inset-0 z-0 pointer-events-none">
-             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-2xl h-[500px] bg-blue-100 rounded-full mix-blend-multiply filter blur-[100px] opacity-60"></div>
-          </div>
+          {/* Subtle grid pattern background */}
+          <div className="absolute inset-0 z-0 pointer-events-none opacity-[0.03]" style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, black 1px, transparent 0)', backgroundSize: '32px 32px' }}></div>
           
           <div className="relative z-10 max-w-2xl mx-auto flex flex-col items-center">
-            <h2 className="text-sm font-bold text-gray-400 tracking-widest uppercase mb-4">04 / The Action</h2>
-            <h3 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">Ready to see it in action?</h3>
-            <p className="text-xl text-gray-500 mb-10 leading-relaxed">
+            <h2 className="text-xs font-semibold text-gray-500 tracking-[0.2em] uppercase mb-5">
+              The Action
+            </h2>
+            <h3 className="text-4xl md:text-5xl font-semibold text-gray-900 tracking-tight mb-6">
+              Ready to see it in action?
+            </h3>
+            <p className="text-lg text-gray-500 mb-10 leading-relaxed max-w-xl">
               Experience the seamless flow yourself. Add a product to your cart and complete a test transaction via the AlyaPay Sandbox.
             </p>
             <Link
               href="/products"
-              className="px-10 py-5 bg-[#002366] text-white text-lg font-bold rounded-2xl hover:bg-blue-900 hover:scale-105 transition-all duration-300 shadow-xl shadow-blue-900/20 flex items-center gap-3"
+              className="group flex items-center justify-center gap-2 px-8 py-4 bg-gray-900 text-white text-[15px] font-medium rounded-xl hover:bg-black transition-all duration-200 ease-out active:scale-[0.97] shadow-lg shadow-gray-900/10"
             >
-              Start the Demo <ArrowRight className="w-5 h-5" />
+              Start the Demo 
+              <ArrowRight className="w-4 h-4 transition-transform duration-200 ease-out group-hover:translate-x-1" />
             </Link>
           </div>
         </motion.div>
