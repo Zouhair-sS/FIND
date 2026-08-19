@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useAuth } from "@/components/AuthContext";
+import { useAdminAuth } from "@/components/AdminAuthContext";
 import { useRouter } from "next/navigation";
 
 export default function AdminLogin() {
-  const { login } = useAuth();
+  const { login } = useAdminAuth();
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

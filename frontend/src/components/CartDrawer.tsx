@@ -7,6 +7,7 @@ import { useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Trash2 } from "lucide-react";
 import { formatPrice } from "@/lib/formatPrice";
+import { getImageUrl } from "@/lib/api";
 
 export default function CartDrawer() {
   const { isCartOpen, setIsCartOpen, enrichedItems, updateQuantity, removeItem, subtotal, isLoadingPrices } = useCart();
@@ -99,7 +100,7 @@ export default function CartDrawer() {
                           >
                             <div className="relative w-20 h-20 bg-gray-50 rounded-xl overflow-hidden flex-shrink-0 border border-gray-100">
                               {item.cachedImage ? (
-                                <Image src={item.cachedImage} alt={item.cachedTitle} fill className="object-contain p-1.5" />
+                                <Image unoptimized src={getImageUrl(item.cachedImage)} alt={item.cachedTitle} fill className="object-contain p-1.5" />
                               ) : (
                                 <div className="w-full h-full flex items-center justify-center text-gray-300">
                                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -120,9 +121,12 @@ export default function CartDrawer() {
                                   </Link>
                                   <button
                                     onClick={() => removeItem(item.variantId)}
-                                    className="text-gray-300 hover:text-red-500 transition-colors -mt-1 -mr-1 p-1"
+                                    className="text-gray-400 hover:text-red-500 transition-colors p-1 flex-shrink-0 ml-2"
+                                    aria-label="Remove item"
                                   >
-                                    <Trash2 className="w-4 h-4" />
+                                    <div className="relative w-4 h-4 opacity-60 hover:opacity-100">
+                                      <Image src="/images/UI/trash-bin.png" alt="Delete" fill className="object-contain" />
+                                    </div>
                                   </button>
                                 </div>
                                 {item.cachedAttributes && (

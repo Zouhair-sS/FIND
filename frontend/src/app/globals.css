@@ -117,3 +117,27 @@ input[type="range"].dual-slider-thumb::-moz-range-thumb {
 .animate-marquee {
   animation: marquee 25s linear infinite;
 }
+
+/* Global performance optimizations for silky smooth animations */
+html, body {
+  scroll-behavior: smooth;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Force hardware acceleration on commonly animated elements to prevent stutter */
+[data-framer-component], 
+.framer-motion,
+.transition-all,
+.transition-transform,
+.transition-opacity,
+.animate-silky-pulse,
+.animate-marquee,
+.group:hover,
+button,
+a,
+input {
+  will-change: transform, opacity;
+  transform: translateZ(0);
+}

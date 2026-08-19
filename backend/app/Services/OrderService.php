@@ -62,8 +62,16 @@ class OrderService
             $orderNumber = $this->generateOrderNumber();
             $vendorReference = $orderNumber; // They are the same per our design
 
+            $userId = auth('sanctum')->id();
+            if (!$userId && !empty($data['customer_email'])) {
+                $user = \App\Models\User::where('email', $data['customer_email'])->first();
+                if ($user) {
+                    $userId = $user->id;
+                }
+            }
+
             $order = Order::create([
-                'user_id' => auth('sanctum')->id(), // Nullable for guests
+                'user_id' => $userId, // Link to authenticated user or matched by email
                 'order_number' => $orderNumber,
                 'vendor_reference' => $vendorReference,
                 'status' => 'pending_payment',

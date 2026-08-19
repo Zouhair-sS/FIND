@@ -6,7 +6,9 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCheckout } from "@/components/CheckoutContext";
 import { useCart } from "@/components/CartContext";
+import { useAuth } from "@/components/AuthContext";
 import { formatPrice } from "@/lib/formatPrice";
+import { getImageUrl } from "@/lib/api";
 import { ChevronDown, ChevronUp, CheckCircle2, Pencil } from "lucide-react";
 import Image from "next/image";
 
@@ -14,11 +16,16 @@ export default function ShippingPage() {
   const router = useRouter();
   const { shippingInfo, setShippingInfo, shippingCost } = useCheckout();
   const { enrichedItems, subtotal } = useCart();
+  const { user } = useAuth();
   
+  // Helper to split user name
+  const defaultFirstName = user?.name ? user.name.split(" ")[0] : "";
+  const defaultLastName = user?.name ? user.name.split(" ").slice(1).join(" ") : "";
+
   // Local form state
   const [phone, setPhone] = useState(shippingInfo?.phone ?? "");
-  const [firstName, setFirstName] = useState(shippingInfo?.firstName ?? "");
-  const [lastName, setLastName] = useState(shippingInfo?.lastName ?? "");
+  const [firstName, setFirstName] = useState(shippingInfo?.firstName ?? defaultFirstName);
+  const [lastName, setLastName] = useState(shippingInfo?.lastName ?? defaultLastName);
   const [city, setCity] = useState(shippingInfo?.city ?? "");
   const [address, setAddress] = useState(shippingInfo?.address ?? "");
   const [addressDetails, setAddressDetails] = useState(shippingInfo?.addressDetails ?? "");
@@ -29,7 +36,7 @@ export default function ShippingPage() {
   const [isRecapOpen, setIsRecapOpen] = useState(true);
   const [shouldRedirect, setShouldRedirect] = useState(false);
 
-  // Sync form state when context hydrates
+  // Sync form state when context hydrates or user loads
   React.useEffect(() => {
     if (shippingInfo) {
       setPhone(shippingInfo.phone);
@@ -40,8 +47,14 @@ export default function ShippingPage() {
       setAddressDetails(shippingInfo.addressDetails || "");
       setZipCode(shippingInfo.zipCode || "");
       setIsFormOpen(false);
+    } else if (user?.name) {
+      const parts = user.name.split(" ");
+      if (!firstName && !lastName) {
+        setFirstName(parts[0]);
+        setLastName(parts.slice(1).join(" "));
+      }
     }
-  }, [shippingInfo]);
+  }, [shippingInfo, user]);
 
   // Wait for state to actually flush to context before navigating
   React.useEffect(() => {
@@ -223,7 +236,7 @@ export default function ShippingPage() {
                   <li key={`${item.productId}-${item.variantId}`} className="flex gap-4">
                     <div className="w-20 h-20 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-center p-2 flex-shrink-0">
                       {item.cachedImage ? (
-                        <Image src={item.cachedImage} alt={item.cachedTitle || 'Product'} width={60} height={60} className="object-contain" />
+                        <Image unoptimized src={getImageUrl(item.cachedImage)} alt={item.cachedTitle || 'Product'} width={60} height={60} className="object-contain" />
                       ) : (
                          <div className="w-10 h-10 bg-gray-200 rounded-full" />
                       )}

@@ -8,6 +8,7 @@ import { useCheckout } from "@/components/CheckoutContext";
 import { useCart } from "@/components/CartContext";
 import { formatPrice } from "@/lib/formatPrice";
 import Image from "next/image";
+import axios from "@/lib/axios";
 
 export default function PaymentPage() {
   const router = useRouter();
@@ -47,21 +48,8 @@ export default function PaymentPage() {
         shipping_city: shippingInfo.city,
       };
 
-      const res = await fetch("http://localhost:8000/api/checkout", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json"
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || "Failed to initiate checkout");
-      }
-
-      const data = await res.json();
+      const res = await axios.post("/api/checkout", payload);
+      const data = res.data;
       
       if (data.checkout_url) {
         window.location.href = data.checkout_url;
@@ -69,7 +57,7 @@ export default function PaymentPage() {
         throw new Error("No checkout URL returned");
       }
     } catch (err: any) {
-      setError(err.message);
+      setError(err.response?.data?.error || err.message);
       setIsProcessing(false);
     }
   };

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronDown, Check, Laptop, Smartphone, Monitor, Headphones } from 'lucide-react';
+import { ChevronDown, Check, Laptop, Smartphone, Monitor, Headphones, Tablet, Speaker, Gamepad2, LayoutGrid } from 'lucide-react';
 
 interface Category {
   id: number;
@@ -16,6 +16,9 @@ const CATEGORY_ICONS: Record<string, React.ReactNode> = {
   "Laptops": <Laptop className="w-4 h-4" />,
   "Smartphones": <Smartphone className="w-4 h-4" />,
   "Monitors": <Monitor className="w-4 h-4" />,
+  "Tablets": <Tablet className="w-4 h-4" />,
+  "Audio": <Speaker className="w-4 h-4" />,
+  "Gaming": <Gamepad2 className="w-4 h-4" />,
   "Accessories": <Headphones className="w-4 h-4" />
 };
 
@@ -33,11 +36,7 @@ export default function CategorySelector({ value, onChange, categories = [] }: C
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Filter to only include the allowed storefront categories
-  const allowedCategories = ["Laptops", "Smartphones", "Monitors", "Accessories"];
-  const filteredCategories = categories.filter(c => allowedCategories.includes(c.name));
-
-  const selectedCategory = filteredCategories.find(c => String(c.id) === String(value));
+  const selectedCategory = categories.find(c => String(c.id) === String(value));
 
   return (
     <div className="relative" ref={containerRef}>
@@ -48,9 +47,9 @@ export default function CategorySelector({ value, onChange, categories = [] }: C
       >
         <div className="flex items-center gap-3">
           {selectedCategory ? (
-            <div className="w-7 h-7 rounded-lg bg-gray-50 border border-gray-100 text-gray-500 flex items-center justify-center">
-              {CATEGORY_ICONS[selectedCategory.name]}
-            </div>
+              <div className="w-7 h-7 rounded-lg bg-gray-50 border border-gray-100 text-gray-500 flex items-center justify-center">
+                {CATEGORY_ICONS[selectedCategory.name] || <LayoutGrid className="w-4 h-4" />}
+              </div>
           ) : (
             <div className="w-7 h-7 bg-gray-50 border border-gray-100 rounded-lg flex items-center justify-center">
               <span className="text-xs text-gray-400 font-medium">C</span>
@@ -72,7 +71,7 @@ export default function CategorySelector({ value, onChange, categories = [] }: C
           >
             Select Category
           </button>
-          {filteredCategories.map((c) => {
+          {categories.map((c) => {
             const isSelected = String(c.id) === String(value);
             return (
               <button
@@ -85,7 +84,7 @@ export default function CategorySelector({ value, onChange, categories = [] }: C
               >
                 <div className="flex items-center gap-3">
                   <div className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${isSelected ? 'bg-white shadow-sm border border-gray-200 text-gray-900' : 'bg-transparent text-gray-500 group-hover:bg-white group-hover:shadow-sm group-hover:border group-hover:border-gray-200 group-hover:text-gray-900'}`}>
-                    {CATEGORY_ICONS[c.name]}
+                    {CATEGORY_ICONS[c.name] || <LayoutGrid className="w-4 h-4" />}
                   </div>
                   <span className={`font-semibold tracking-wide ${isSelected ? 'text-gray-900' : 'text-gray-600 group-hover:text-gray-900'}`}>
                     {c.name}

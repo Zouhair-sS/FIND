@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Trash2, Check, ChevronDown, ChevronUp, Lock } from "lucide-react";
 import { formatPrice } from "@/lib/formatPrice";
+import { getImageUrl } from "@/lib/api";
 
 export default function CartPage() {
   const { enrichedItems, updateQuantity, removeItem, subtotal, isLoadingPrices, itemCount } = useCart();
@@ -18,7 +19,7 @@ export default function CartPage() {
   const [isPromoOpen, setIsPromoOpen] = useState(false);
 
   const shipping = subtotal > 0 ? (subtotal > 5000 ? 0 : 50) : 0; 
-  const taxRate = 0.20; // 20% VAT
+  const taxRate = 0; // Prices are TTC
   const tax = subtotal * taxRate;
   const total = subtotal + shipping + tax;
 
@@ -120,7 +121,7 @@ export default function CartPage() {
                     {/* Image */}
                     <div className="w-full sm:w-48 aspect-square bg-gray-50/80 rounded-2xl flex-shrink-0 relative overflow-hidden border border-gray-100/50">
                       {item.cachedImage ? (
-                        <Image src={item.cachedImage} alt={item.cachedTitle} fill className="object-contain p-4 mix-blend-multiply" />
+                        <Image unoptimized src={getImageUrl(item.cachedImage)} alt={item.cachedTitle} fill className="object-contain p-4 mix-blend-multiply" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-gray-300">
                            <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -190,7 +191,9 @@ export default function CartPage() {
                           onClick={() => removeItem(item.variantId)}
                           className="flex items-center text-sm font-medium text-gray-400 hover:text-red-500 transition-colors gap-1.5"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <div className="relative w-4 h-4 opacity-60 hover:opacity-100">
+                            <Image src="/images/UI/trash-bin.png" alt="Delete" fill className="object-contain" />
+                          </div>
                           Remove
                         </button>
                       </div>
@@ -225,9 +228,9 @@ export default function CartPage() {
               </dd>
             </div>
             <div className="flex justify-between">
-              <dt>Estimated Tax (20%)</dt>
+              <dt>Estimated Tax (Included)</dt>
               <dd className="font-medium text-gray-900">
-                {isLoadingPrices ? "..." : <>{formatPrice(tax)} <span className="text-xs text-gray-400">MAD</span></>}
+                {isLoadingPrices ? "..." : tax === 0 ? "0 MAD" : <>{formatPrice(tax)} <span className="text-xs text-gray-400">MAD</span></>}
               </dd>
             </div>
           </dl>

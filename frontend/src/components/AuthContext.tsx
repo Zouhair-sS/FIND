@@ -8,6 +8,7 @@ export interface User {
   name: string;
   email: string;
   role?: string;
+  profile_picture?: string;
 }
 
 interface AuthContextType {
@@ -45,13 +46,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (data: Record<string, unknown>) => {
     await axios.get("/sanctum/csrf-cookie");
     await axios.post("/api/login", data);
-    await refreshUser();
+    
+    const res = await axios.get("/api/user");
+    const loggedInUser = res.data;
+    
+    if (typeof window !== "undefined" && loggedInUser) {
+      const savedCart = localStorage.getItem(`find_cart_v3_${loggedInUser.id}`);
+      const savedShipping = localStorage.getItem(`find_checkout_shipping_${loggedInUser.id}`);
+      if (savedCart) localStorage.setItem("find_cart_v3", savedCart);
+      if (savedShipping) localStorage.setItem("find_checkout_shipping", savedShipping);
+      window.dispatchEvent(new Event("reload-cart"));
+    }
+    
+    setUser(loggedInUser);
   };
 
   const register = async (data: Record<string, unknown>) => {
     await axios.get("/sanctum/csrf-cookie");
     await axios.post("/api/register", data);
-    await refreshUser();
+    const res = await axios.get("/api/user");
+    setUser(res.data);
   };
 
   const logout = async () => {
@@ -60,6 +74,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       console.error("Logout failed on server, clearing local state");
     } finally {
+      if (typeof window !== "undefined" && user) {
+        const cart = localStorage.getItem("find_cart_v3");
+        const shipping = localStorage.getItem("find_checkout_shipping");
+        if (cart) localStorage.setItem(`find_cart_v3_${user.id}`, cart);
+        if (shipping) localStorage.setItem(`find_checkout_shipping_${user.id}`, shipping);
+        
+        localStorage.removeItem("find_cart_v3");
+        localStorage.removeItem("find_checkout_shipping");
+        window.location.href = "/";
+      }
       setUser(null);
     }
   };

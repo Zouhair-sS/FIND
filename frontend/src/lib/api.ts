@@ -51,6 +51,7 @@ export interface ProductVariant {
   screen_size: number | null;
   color: string | null;
   processor: string | null;
+  product_image_id: number | null;
   attributes: Record<string, string | number | boolean> | null;
 }
 
@@ -120,7 +121,7 @@ export async function fetchCategories(): Promise<Category[]> {
 }
 
 export async function fetchCategoryBySlug(slug: string): Promise<Category & { products: Product[] }> {
-  const res = await fetch(`${API_BASE}/categories/${slug}`, { next: { revalidate: 60 } });
+  const res = await fetch(`${API_BASE}/categories/${slug}?includeChildren=true`, { next: { revalidate: 60 } });
   if (!res.ok) throw new Error("Failed to fetch category");
   return res.json();
 }
@@ -154,92 +155,178 @@ export async function fetchAllProductsWithFilters(): Promise<Category & { produc
   return res.json();
 }
 
+
 // --- ADMIN API ENDPOINTS ---
 // We use the configured axios instance here because Admin endpoints require Sanctum authentication (cookies).
 import axios from './axios';
+import adminAxios from './adminAxios';
 
-export async function fetchAdminDashboard(): Promise<any> {
-  const res = await axios.get('/api/admin/dashboard');
+export async function fetchAdminDashboard(chartPeriod: string = '30_days', sellingPeriod: string = '30_days'): Promise<any> {
+  const res = await adminAxios.get(`/api/admin/dashboard?chart_period=${chartPeriod}&selling_period=${sellingPeriod}`);
+  return res.data;
+}
+
+export async function fetchUserOrders(): Promise<any> {
+  const res = await axios.get('/api/user/orders');
+  return res.data;
+}
+
+export async function updateUserProfile(data: FormData): Promise<any> {
+  const res = await axios.post('/api/user/profile?_method=PUT', data, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+  return res.data;
+}
+
+export async function updateUserPassword(data: any): Promise<any> {
+  const res = await axios.put('/api/user/password', data);
+  return res.data;
+}
+
+export async function fetchAdminProfile(): Promise<any> {
+  const res = await adminAxios.get('/api/admin/profile');
+  return res.data;
+}
+
+export async function updateAdminProfile(data: FormData): Promise<any> {
+  const res = await adminAxios.post('/api/admin/profile', data, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  });
   return res.data;
 }
 
 export async function fetchAdminOrders(page: number = 1): Promise<PaginatedResponse<any>> {
-  const res = await axios.get(`/api/admin/orders?page=${page}`);
+  const res = await adminAxios.get(`/api/admin/orders?page=${page}`);
   return res.data;
 }
 
 export async function fetchAdminOrder(id: string | number): Promise<any> {
-  const res = await axios.get(`/api/admin/orders/${id}`);
+  const res = await adminAxios.get(`/api/admin/orders/${id}`);
   return res.data;
 }
 
+export const fetchAdminCustomers = async () => {
+  return adminAxios.get("/api/admin/customers").then((res) => res.data);
+};
+
+export const fetchAdminCustomer = async (id: string) => {
+  return adminAxios.get(`/api/admin/customers/${id}`).then((res) => res.data);
+};
+
+export const fetchAdminCategories = async () => {
+  return adminAxios.get("/api/admin/categories").then((res) => res.data);
+};
+
+export const createAdminCategory = async (data: { name: string; slug: string }) => {
+  return adminAxios.post("/api/admin/categories", data).then((res) => res.data);
+};
+
+export const updateAdminCategory = async (id: number, data: { name: string; slug: string }) => {
+  return adminAxios.put(`/api/admin/categories/${id}`, data).then((res) => res.data);
+};
+
+export const deleteAdminCategory = async (id: number) => {
+  return adminAxios.delete(`/api/admin/categories/${id}`).then((res) => res.data);
+};
+
+export const createAdminBrand = async (data: FormData) => {
+  return adminAxios.post("/api/admin/brands", data, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }).then((res) => res.data);
+};
+
+export const updateAdminBrand = async (id: number, data: FormData) => {
+  return adminAxios.post(`/api/admin/brands/${id}`, data, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }).then((res) => res.data);
+};
+
+export const deleteAdminBrand = async (id: number) => {
+  return adminAxios.delete(`/api/admin/brands/${id}`).then((res) => res.data);
+};
+
 export async function fetchAdminPayments(page: number = 1): Promise<PaginatedResponse<any>> {
-  const res = await axios.get(`/api/admin/payments?page=${page}`);
+  const res = await adminAxios.get(`/api/admin/payments?page=${page}`);
+  return res.data;
+}
+
+export async function deleteAdminOrder(id: string | number): Promise<any> {
+  const res = await adminAxios.delete(`/api/admin/orders/${id}`);
   return res.data;
 }
 
 export async function updateAdminOrderStatus(id: string | number, status: string): Promise<any> {
-  const res = await axios.put(`/api/admin/orders/${id}/status`, { status });
+  const res = await adminAxios.put(`/api/admin/orders/${id}/status`, { status });
   return res.data;
 }
 
 export async function fetchAdminMetadata(): Promise<any> {
-  const res = await axios.get('/api/admin/metadata');
+  const res = await adminAxios.get('/api/admin/metadata');
   return res.data;
 }
 
-export async function fetchAdminProducts(page: number = 1, search: string = ''): Promise<PaginatedResponse<any>> {
+export async function fetchAdminBrands(): Promise<any[]> {
+  const res = await adminAxios.get('/api/admin/brands');
+  return res.data;
+}
+
+export async function fetchAdminProducts(page: number = 1, search: string = '', categoryId: string = '', stockStatus: string = '', brandId: string = ''): Promise<PaginatedResponse<any>> {
   const params = new URLSearchParams();
   if (page) params.append('page', page.toString());
   if (search) params.append('search', search);
-  const res = await axios.get(`/api/admin/products?${params.toString()}`);
+  if (categoryId) params.append('category_id', categoryId);
+  if (stockStatus) params.append('stock_status', stockStatus);
+  if (brandId) params.append('brand_id', brandId);
+  const res = await adminAxios.get(`/api/admin/products?${params.toString()}`);
   return res.data;
 }
 
 export async function fetchAdminProduct(id: string | number): Promise<any> {
-  const res = await axios.get(`/api/admin/products/${id}`);
+  const res = await adminAxios.get(`/api/admin/products/${id}`);
   return res.data;
 }
 
 export async function createAdminProduct(data: any): Promise<any> {
-  const res = await axios.post('/api/admin/products', data);
+  const res = await adminAxios.post('/api/admin/products', data);
   return res.data;
 }
 
 export async function updateAdminProduct(id: string | number, data: any): Promise<any> {
-  const res = await axios.put(`/api/admin/products/${id}`, data);
+  const res = await adminAxios.put(`/api/admin/products/${id}`, data);
   return res.data;
 }
 
 export async function deleteAdminProduct(id: string | number): Promise<any> {
-  const res = await axios.delete(`/api/admin/products/${id}`);
+  const res = await adminAxios.delete(`/api/admin/products/${id}`);
   return res.data;
 }
 
 // Configurations
 export async function addAdminConfiguration(groupId: string | number, data: any): Promise<any> {
-  const res = await axios.post(`/api/admin/products/${groupId}/configurations`, data);
+  const res = await adminAxios.post(`/api/admin/products/${groupId}/configurations`, data);
   return res.data;
 }
 
 export async function deleteAdminConfiguration(configId: string | number): Promise<any> {
-  const res = await axios.delete(`/api/admin/products/configurations/${configId}`);
+  const res = await adminAxios.delete(`/api/admin/products/configurations/${configId}`);
   return res.data;
 }
 
 // Variants
 export async function createAdminVariant(configId: string | number, data: any): Promise<ProductVariant> {
-  const res = await axios.post(`/api/admin/products/configurations/${configId}/variants`, data);
+  const res = await adminAxios.post(`/api/admin/products/configurations/${configId}/variants`, data);
   return res.data;
 }
 
 export async function updateAdminVariant(variantId: string | number, data: any): Promise<ProductVariant> {
-  const res = await axios.put(`/api/admin/products/variants/${variantId}`, data);
+  const res = await adminAxios.put(`/api/admin/products/variants/${variantId}`, data);
   return res.data;
 }
 
 export async function deleteAdminVariant(variantId: string | number): Promise<any> {
-  const res = await axios.delete(`/api/admin/products/variants/${variantId}`);
+  const res = await adminAxios.delete(`/api/admin/products/variants/${variantId}`);
   return res.data;
 }
 
@@ -247,19 +334,19 @@ export async function deleteAdminVariant(variantId: string | number): Promise<an
 export async function uploadAdminProductImage(configId: string | number, file: File): Promise<any> {
   const formData = new FormData();
   formData.append('image', file);
-  const res = await axios.post(`/api/admin/products/configurations/${configId}/images`, formData, {
+  const res = await adminAxios.post(`/api/admin/products/configurations/${configId}/images`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   });
   return res.data;
 }
 
 export async function deleteAdminProductImage(imageId: string | number): Promise<any> {
-  const res = await axios.delete(`/api/admin/products/images/${imageId}`);
+  const res = await adminAxios.delete(`/api/admin/products/images/${imageId}`);
   return res.data;
 }
 
 export async function reorderAdminProductImages(configId: string | number, imageIds: number[]): Promise<any> {
-  const res = await axios.put(`/api/admin/products/configurations/${configId}/images/reorder`, { image_ids: imageIds });
+  const res = await adminAxios.put(`/api/admin/products/configurations/${configId}/images/reorder`, { image_ids: imageIds });
   return res.data;
 }
 

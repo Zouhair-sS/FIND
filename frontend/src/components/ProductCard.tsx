@@ -1,13 +1,13 @@
 "use client";
 
 import { motion } from "framer-motion";
-
 import Link from "next/link";
 import Image from "next/image";
 import { useState } from "react";
 import type { Product } from "@/lib/api";
 import { formatPrice } from "@/lib/formatPrice";
 import { getImageUrl } from "@/lib/api";
+import { useCart } from "@/components/CartContext";
 
 const COLOR_MAP: Record<string, string> = {
   "Midnight": "#1c1f24",
@@ -53,6 +53,22 @@ const BRAND_LOGOS: Record<string, string> = {
   "Lenovo": "/images/LOGOS/Brands/lenovo.svg",
   "Dell": "/images/LOGOS/Brands/dell.svg",
   "ASUS": "/images/LOGOS/Brands/Rog strix.png",
+  "Beats": "/images/LOGOS/Brands/beats-electronics.svg",
+  "Bose": "/images/LOGOS/Brands/bose.svg",
+  "Sony": "/images/LOGOS/Brands/sony-logo-1.svg",
+  "JBL": "/images/LOGOS/Brands/jbl-2.svg",
+  "Soundcore": "/images/LOGOS/Brands/soundcore.svg",
+  "Microsoft": "/images/LOGOS/Brands/microsoft-5.svg",
+  "HP": "/images/LOGOS/Brands/hp.svg",
+  "Huawei": "/images/LOGOS/Brands/huawei-pure-.svg",
+  "Xiaomi": "/images/LOGOS/Brands/xiaomi-logo-2.svg",
+  "MSI": "/images/LOGOS/Brands/msi-3.svg",
+  "Razer": "/images/LOGOS/Brands/razer.svg",
+  "Logitech": "/images/LOGOS/Brands/logitech-gaming-2.svg",
+  "LG": "/images/LOGOS/Brands/lg-electronics.svg",
+  "Gigabyte": "/images/LOGOS/Brands/gigabyte-technology-logo-2008.svg",
+  "ROG Strix": "/images/LOGOS/Brands/Rog strix.png",
+  "Samsung Odyssey": "/images/LOGOS/Brands/Samsung_Odyssey.svg",
 };
 
 const PROCESSOR_BADGES: Record<string, string> = {
@@ -96,12 +112,13 @@ const getScaleClass = (brand?: string | null, categorySlug?: string | null, prod
 export default function ProductCard({
   product,
   activeFilters = {},
-  activePriceRange
+  activePriceRange = null
 }: {
   product: Product;
   activeFilters?: Record<string, (string | number)[]>;
-  activePriceRange?: { min: number, max: number };
+  activePriceRange?: { min: number, max: number } | null;
 }) {
+  const { items: cartItems } = useCart();
   const variantLevelSlugs = ["ram_gb", "storage_gb", "processor", "screen_size"];
 
   const activeVariantFilters = Object.entries(activeFilters).filter(
@@ -151,25 +168,51 @@ export default function ProductCard({
 
   const [selectedColor, setSelectedColor] = useState<string | null>(initialColor);
 
+  const totalStock = product.variants && product.variants.length > 0 
+    ? product.variants.reduce((acc, v) => acc + (v.stock_quantity || 0), 0)
+    : (product.stock || 0);
+  
+  const quantityInCart = product.variants && product.variants.length > 0
+    ? product.variants.reduce((acc, v) => {
+        const item = cartItems.find(i => i.productId === product.id && i.variantId === v.id);
+        return acc + (item ? item.quantity : 0);
+      }, 0)
+    : (cartItems.find(i => i.productId === product.id)?.quantity || 0);
+    
+  const availableStock = Math.max(0, totalStock - quantityInCart);
+
   let displayImageUrl = product.thumbnail || product.images?.[0]?.url;
   if (selectedColor && product.images) {
-    const selectedTokens = selectedColor.toLowerCase().split(' ');
-    let bestMatch = null;
-    let maxScore = -1;
-    product.images.forEach(img => {
-      const url = decodeURIComponent(img.url).toLowerCase();
-      let score = 0;
-      if (url.includes(selectedColor.toLowerCase())) score += 10;
-      selectedTokens.forEach(token => {
-        if (token.length >= 3 && url.includes(token)) score += 1;
-      });
-      if (score > maxScore) {
-        maxScore = score;
-        bestMatch = img;
+    let exactImageFound = false;
+    const colorVariant = product.variants?.find(v => v.color === selectedColor);
+    
+    if (colorVariant?.product_image_id) {
+      const exactImg = product.images.find(img => img.id === colorVariant.product_image_id);
+      if (exactImg) {
+        displayImageUrl = exactImg.url;
+        exactImageFound = true;
       }
-    });
-    if (bestMatch && maxScore > 0) {
-      displayImageUrl = (bestMatch as import("@/lib/api").ProductImage).url;
+    }
+
+    if (!exactImageFound) {
+      const selectedTokens = selectedColor.toLowerCase().split(' ');
+      let bestMatch = null;
+      let maxScore = -1;
+      product.images.forEach(img => {
+        const url = decodeURIComponent(img.url).toLowerCase();
+        let score = 0;
+        if (url.includes(selectedColor.toLowerCase())) score += 10;
+        selectedTokens.forEach(token => {
+          if (token.length >= 3 && url.includes(token)) score += 1;
+        });
+        if (score > maxScore) {
+          maxScore = score;
+          bestMatch = img;
+        }
+      });
+      if (bestMatch && maxScore > 0) {
+        displayImageUrl = (bestMatch as import("@/lib/api").ProductImage).url;
+      }
     }
   }
 
@@ -223,7 +266,7 @@ export default function ProductCard({
 
           {/* Processor Badge - Bottom Right */}
           {processorBadge && (
-            <div className="absolute bottom-3 right-3 z-10 w-9 h-9 pointer-events-none">
+            <div className="absolute bottom-3 left-3 z-10 w-9 h-9 pointer-events-none">
               <Image
                 src={processorBadge}
                 alt={processor || 'Processor badge'}
@@ -236,6 +279,17 @@ export default function ProductCard({
               />
             </div>
           )}
+
+          {/* Stock Badges - Bottom Right */}
+          {availableStock <= 0 ? (
+            <div className="absolute bottom-3 right-3 z-10 px-2.5 py-1 bg-white/95 backdrop-blur-sm rounded-lg shadow-sm border border-red-100">
+              <span className="text-[10px] font-bold text-red-500 uppercase tracking-wide">Out of stock</span>
+            </div>
+          ) : availableStock < 5 ? (
+            <div className="absolute bottom-3 right-3 z-10 px-2.5 py-1 bg-white/95 backdrop-blur-sm rounded-lg shadow-sm border border-yellow-200">
+              <span className="text-[10px] font-bold text-yellow-600 uppercase tracking-wide">Limited quantity</span>
+            </div>
+          ) : null}
         </div>
 
         {/* Info */}
@@ -254,14 +308,16 @@ export default function ProductCard({
           return <p className="text-xs text-gray-500 mt-1">{configParts.join(' · ')}</p>;
         })()}
 
-        <p className="text-sm font-bold text-gray-900 mt-1">
-          {price > 0 ? (
-            <>
-              {formatPrice(price)}{' '}
-              <span className="text-xs text-gray-400 font-normal">MAD</span>
-            </>
-          ) : "Price unavailable"}
-        </p>
+        <div className="flex items-center justify-between mt-1">
+          <p className="text-sm font-bold text-gray-900">
+            {price > 0 ? (
+              <>
+                {formatPrice(price)}{' '}
+                <span className="text-xs text-gray-400 font-normal">MAD</span>
+              </>
+            ) : "Price unavailable"}
+          </p>
+        </div>
       </Link>
 
       {/* Color Swatches */}

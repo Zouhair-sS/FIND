@@ -4,6 +4,7 @@ import { useEffect, useState, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCart } from "@/components/CartContext";
 import { CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import axios from "@/lib/axios";
 
 function CallbackContent() {
   const router = useRouter();
@@ -37,20 +38,11 @@ function CallbackContent() {
 
     const verifyPayment = async () => {
       try {
-        const res = await fetch("http://localhost:8000/api/verify-payment", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Accept": "application/json"
-          },
-          body: JSON.stringify({ vendor_reference: vendorReference }),
+        const res = await axios.post("/api/verify-payment", {
+          vendor_reference: vendorReference
         });
 
-        if (!res.ok) {
-          throw new Error("Verification request failed");
-        }
-
-        const data = await res.json();
+        const data = res.data;
 
         if (data.verified) {
           setStatus("success");

@@ -7,7 +7,7 @@ export default async function HomePage() {
 
   try {
     const [productsRes, categoriesRes] = await Promise.all([
-      fetchProducts(),
+      fetchProducts("per_page=100"),
       fetchCategories(),
     ]);
     products = productsRes;

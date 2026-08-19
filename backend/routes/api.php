@@ -49,9 +49,24 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::get('/orders', [AdminController::class, 'getOrders']);
     Route::get('/orders/{id}', [AdminController::class, 'getOrder']);
     Route::delete('/orders/{id}', [AdminController::class, 'deleteOrder']);
-    Route::get('/payments', [AdminController::class, 'getPayments']);
     Route::put('/orders/{id}/status', [AdminController::class, 'updateOrderStatus']);
     
+    // Customers
+    Route::get('/customers', [AdminController::class, 'getCustomers']);
+    Route::get('/customers/{id}', [AdminController::class, 'getCustomer']);
+
+    // Categories (Admin CRUD)
+    Route::get('/categories', [AdminController::class, 'getCategories']);
+    Route::post('/categories', [AdminController::class, 'createCategory']);
+    Route::put('/categories/{id}', [AdminController::class, 'updateCategory']);
+    Route::delete('/categories/{id}', [AdminController::class, 'deleteCategory']);
+
+    // Brands
+    Route::get('/brands', [AdminController::class, 'getBrands']);
+    Route::post('/brands', [AdminController::class, 'createBrand']);
+    Route::post('/brands/{id}', [AdminController::class, 'updateBrand']); // use POST for form-data (PUT/PATCH can have issues with multipart in PHP)
+    Route::delete('/brands/{id}', [AdminController::class, 'deleteBrand']);
+
     // Metadata
     Route::get('/metadata', [\App\Http\Controllers\Api\Admin\MetadataController::class, 'getMetadata']);
 
@@ -79,3 +94,4 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::get('/profile', [\App\Http\Controllers\Api\Admin\ProfileController::class, 'getProfile']);
     Route::post('/profile', [\App\Http\Controllers\Api\Admin\ProfileController::class, 'updateProfile']);
 });
+Route::post('/test-product', [\App\Http\Controllers\Api\Admin\ProductController::class, 'store']);

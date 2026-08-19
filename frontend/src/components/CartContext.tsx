@@ -19,6 +19,7 @@ export interface CartItem {
   quantity: number;
   
   // Cached for fast rendering before API loads the fresh price/data
+  cachedPrice?: number;
   cachedTitle: string;
   cachedImage?: string;
   cachedAttributes?: string; 
@@ -62,18 +63,26 @@ export function CartProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsMounted(true);
-    const saved = localStorage.getItem("find_cart_v3");
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (!parsed.cartId) parsed.cartId = generateUUID();
-        setState(parsed);
-      } catch {
+    
+    const loadCart = () => {
+      const saved = localStorage.getItem("find_cart_v3");
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (!parsed.cartId) parsed.cartId = generateUUID();
+          setState(parsed);
+        } catch {
+          setState({ cartId: generateUUID(), items: [] });
+        }
+      } else {
         setState({ cartId: generateUUID(), items: [] });
       }
-    } else {
-      setState({ cartId: generateUUID(), items: [] });
-    }
+    };
+
+    loadCart();
+
+    window.addEventListener("reload-cart", loadCart);
+    return () => window.removeEventListener("reload-cart", loadCart);
   }, []);
 
   // 2. Save to local storage
@@ -182,7 +191,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const enrichedItems: EnrichedCartItem[] = useMemo(() => {
     return state.items.map(item => ({
       ...item,
-      price: livePrices[item.variantId]?.price ?? null,
+      price: livePrices[item.variantId]?.price ?? item.cachedPrice ?? null,
       stock_quantity: livePrices[item.variantId]?.stock ?? null,
     }));
   }, [state.items, livePrices]);

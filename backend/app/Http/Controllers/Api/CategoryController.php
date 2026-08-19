@@ -98,13 +98,21 @@ class CategoryController extends Controller
         };
 
         $addFilter('Brand', 'brand', $brands);
-        $addFilter('Processor', 'processor', $processors);
+
+        if ($category->slug !== 'smartphones') {
+            $addFilter('Processor', 'processor', $processors);
+            $addFilter('Screen Size', 'screen_size', $screens, true);
+        }
+
         $addFilter('RAM', 'ram_gb', $rams, true);
         $addFilter('Storage', 'storage_gb', $storages, true);
-        $addFilter('Screen Size', 'screen_size', $screens, true);
 
         foreach ($customAttributes as $attrName => $counts) {
-            $addFilter($attrName, Str::slug($attrName), $counts);
+            $slug = Str::slug($attrName);
+            if ($category->slug === 'laptops' && in_array($slug, ['os', 'usage'])) continue;
+            if ($category->slug === 'smartphones' && in_array($slug, ['os'])) continue;
+            if ($category->slug === 'monitors' && $slug === 'usage') continue;
+            $addFilter($attrName, $slug, $counts);
         }
 
         $category->setRelation('products', $products);

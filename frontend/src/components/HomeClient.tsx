@@ -39,18 +39,25 @@ export default function HomeClient({ products, categories }: { products: any, ca
   const getDiverseProducts = (items: any[]) => {
     if (!items) return [];
     const diverse: any[] = [];
-    const seenNames = new Set();
+    const seenCategories = new Set();
+    
+    // First pass: Try to pick one product from each unique category
     for (const p of items) {
-      if (!seenNames.has(p.name)) {
-        seenNames.add(p.name);
+      const categoryId = p.category?.id || p.category_id || "unknown";
+      if (!seenCategories.has(categoryId)) {
+        seenCategories.add(categoryId);
         diverse.push(p);
       }
       if (diverse.length === 4) break;
     }
+    
+    // Second pass: If we need more to reach 4, fill with other unique products
     if (diverse.length < 4) {
+      const seenNames = new Set(diverse.map(d => d.name));
       for (const p of items) {
-        if (!diverse.find(d => d.id === p.id)) {
+        if (!diverse.find(d => d.id === p.id) && !seenNames.has(p.name)) {
           diverse.push(p);
+          seenNames.add(p.name);
         }
         if (diverse.length === 4) break;
       }

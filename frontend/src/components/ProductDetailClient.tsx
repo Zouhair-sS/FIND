@@ -67,7 +67,7 @@ const getScaleClass = (brand?: string | null, categorySlug?: string | null) => {
 
 const imageVariants = {
   enter: (direction: number) => ({
-    x: direction === 0 ? 0 : (direction > 0 ? '100%' : '-100%'),
+    x: direction === 0 ? 0 : (direction > 0 ? 40 : -40),
     opacity: 0
   }),
   center: {
@@ -75,7 +75,7 @@ const imageVariants = {
     opacity: 1
   },
   exit: (direction: number) => ({
-    x: direction === 0 ? 0 : (direction < 0 ? '100%' : '-100%'),
+    x: direction === 0 ? 0 : (direction < 0 ? 40 : -40),
     opacity: 0
   })
 };
@@ -141,6 +141,17 @@ export default function ProductDetailClient({ product }: { product: Product }) {
     setSelectedColor(color);
     
     // Switch image
+    const colorVariant = variants.find(v => v.color === color);
+    if (colorVariant?.product_image_id) {
+      const exactImgIdx = images.findIndex(img => img.id === colorVariant.product_image_id);
+      if (exactImgIdx !== -1) {
+        setSlideDirection(0);
+        setSelectedImageIdx(exactImgIdx);
+        return; // Exact match found, stop here
+      }
+    }
+
+    // Fallback heuristic if no exact image is linked
     const colorTokens = color.toLowerCase().split(' ');
     let bestIdx = -1;
     let maxScore = -1;
@@ -174,6 +185,7 @@ export default function ProductDetailClient({ product }: { product: Product }) {
       productSlug: product.slug,
       variantId: currentVariant.id,
       quantity,
+      cachedPrice: price,
       cachedTitle: product.name,
       cachedImage: images[selectedImageIdx]?.url,
       cachedAttributes: attrs.join(" • ")
@@ -212,7 +224,7 @@ export default function ProductDetailClient({ product }: { product: Product }) {
             className="relative aspect-square rounded-xl overflow-hidden mb-4 bg-gray-50/50 group cursor-zoom-in"
             onClick={() => setIsLightboxOpen(true)}
           >
-            <AnimatePresence initial={false} custom={slideDirection}>
+            <AnimatePresence mode="wait" initial={false} custom={slideDirection}>
               {images[selectedImageIdx] ? (
                 <motion.div
                   key={selectedImageIdx}
@@ -221,7 +233,7 @@ export default function ProductDetailClient({ product }: { product: Product }) {
                   initial="enter"
                   animate="center"
                   exit="exit"
-                  transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                  transition={{ duration: 0.25, ease: "easeInOut" }}
                   className="absolute inset-0 flex items-center justify-center pointer-events-none"
                 >
                   <Image
@@ -492,7 +504,7 @@ export default function ProductDetailClient({ product }: { product: Product }) {
                 className="relative w-[90vw] h-[90vh] max-w-5xl max-h-[800px] overflow-hidden rounded-xl"
                 onClick={(e) => e.stopPropagation()}
               >
-                <AnimatePresence initial={false} custom={slideDirection}>
+                <AnimatePresence mode="wait" initial={false} custom={slideDirection}>
                   <motion.div
                     key={selectedImageIdx}
                     custom={slideDirection}
@@ -500,11 +512,12 @@ export default function ProductDetailClient({ product }: { product: Product }) {
                     initial="enter"
                     animate="center"
                     exit="exit"
-                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                    transition={{ duration: 0.25, ease: "easeInOut" }}
                     className="absolute inset-0"
                   >
                     <Image
-                      src={images[selectedImageIdx].url}
+                      unoptimized
+                      src={getImageUrl(images[selectedImageIdx].url)}
                       alt={product.name}
                       fill
                       className="object-contain"

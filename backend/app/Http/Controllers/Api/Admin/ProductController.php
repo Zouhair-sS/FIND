@@ -27,6 +27,21 @@ class ProductController extends Controller
             $query->where('name', 'like', '%' . $request->search . '%');
         }
 
+        if ($request->filled('category_id')) {
+            $categoryId = $request->category_id;
+            // Get category and its children if any
+            $categoryIds = \App\Models\Category::where('id', $categoryId)
+                ->orWhere('parent_id', $categoryId)
+                ->pluck('id')
+                ->toArray();
+                
+            $query->whereIn('category_id', $categoryIds);
+        }
+
+        if ($request->filled('brand_id')) {
+            $query->where('brand_id', $request->brand_id);
+        }
+
         $products = $query->orderBy('name')->get();
 
         // Group by storefront identity
@@ -51,8 +66,19 @@ class ProductController extends Controller
                 'price_max' => $allVariants->count() > 0 ? (float) $allVariants->max('price') : 0,
                 'thumbnail' => $firstImage?->url,
             ];
-        })->values()->sortBy('name')->values();
+        });
 
+        if ($request->filled('stock_status')) {
+            $status = $request->stock_status;
+            $result = $result->filter(function ($item) use ($status) {
+                if ($status === 'in_stock') return $item['total_stock'] > 0;
+                if ($status === 'out_of_stock') return $item['total_stock'] === 0;
+                return true;
+            });
+        }
+        
+        $result = $result->values()->sortBy('name')->values();
+        
         // Manual pagination over grouped results
         $page = max(1, (int) $request->get('page', 1));
         $perPage = 15;

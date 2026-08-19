@@ -3,7 +3,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 
 class Brand extends Model {
-    protected $fillable = ['name', 'slug'];
+    protected $fillable = ['name', 'slug', 'image_url'];
     public function series() { return $this->hasMany(Series::class); }
     public function products() { return $this->hasMany(Product::class); }
+    public function categories() { return $this->belongsToMany(Category::class, 'brand_category'); }
 }

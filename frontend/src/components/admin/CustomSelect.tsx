@@ -11,9 +11,10 @@ interface CustomSelectProps {
   onChange: (value: string | number) => void;
   options: Option[];
   placeholder?: string;
+  className?: string;
 }
 
-export default function CustomSelect({ value, onChange, options, placeholder = "Select an option" }: CustomSelectProps) {
+export default function CustomSelect({ value, onChange, options, placeholder = "Select an option", className = "" }: CustomSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -34,7 +35,7 @@ export default function CustomSelect({ value, onChange, options, placeholder = "
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-white flex items-center justify-between hover:bg-gray-50 transition-all focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary shadow-sm h-[42px]"
+        className={`w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-white flex items-center justify-between hover:bg-gray-50 transition-all focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary shadow-sm h-[42px] ${className}`}
       >
         <span className={value !== "" && value !== null ? "text-gray-900 font-semibold tracking-wide" : "text-gray-400 font-medium"}>
           {selectedOption ? selectedOption.label : placeholder}

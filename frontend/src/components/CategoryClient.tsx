@@ -7,6 +7,7 @@ import SidebarFilter from "./SidebarFilter";
 import { X } from "lucide-react";
 import { formatPrice } from "@/lib/formatPrice";
 import { useRouter } from "next/navigation";
+import { useCart } from "@/components/CartContext";
 
 const variantLevelSlugs = ["ram_gb", "storage_gb", "processor", "screen_size"];
 
@@ -15,14 +16,17 @@ export default function CategoryClient({ category }: { category: Category }) {
   const filtersDef = category.filters ?? [];
   const priceRange = category.price ?? { min: 0, max: 0 };
   const router = useRouter();
+  const { items: cartItems } = useCart();
 
   const [selectedFilters, setSelectedFilters] = useState<Record<string, (string | number)[]>>({});
   const [selectedPriceRange, setSelectedPriceRange] = useState<{min: number, max: number}>(priceRange);
   const [inStockOnly, setInStockOnly] = useState<boolean>(false);
+  const [veryLimitedStockOnly, setVeryLimitedStockOnly] = useState<boolean>(false);
 
   const [activeFilters, setActiveFilters] = useState(selectedFilters);
   const [activePriceRange, setActivePriceRange] = useState(selectedPriceRange);
   const [activeInStockOnly, setActiveInStockOnly] = useState(inStockOnly);
+  const [activeVeryLimitedStockOnly, setActiveVeryLimitedStockOnly] = useState(veryLimitedStockOnly);
   const [isFiltering, setIsFiltering] = useState(false);
 
   useEffect(() => {
@@ -31,14 +35,19 @@ export default function CategoryClient({ category }: { category: Category }) {
       setActiveFilters(selectedFilters);
       setActivePriceRange(selectedPriceRange);
       setActiveInStockOnly(inStockOnly);
+      setActiveVeryLimitedStockOnly(veryLimitedStockOnly);
       setIsFiltering(false);
     }, 300);
     return () => clearTimeout(t);
-  }, [selectedFilters, selectedPriceRange, inStockOnly]);
+  }, [selectedFilters, selectedPriceRange, inStockOnly, veryLimitedStockOnly]);
 
   const handleFilterChange = (slug: string, value: string | number) => {
     if (slug === "category") {
-      router.push(`/${String(value).toLowerCase()}`);
+      const categorySlug = String(value)
+        .toLowerCase()
+        .replace(/\s*&\s*/g, '-')
+        .replace(/\s+/g, '-');
+      router.push(`/${categorySlug}`);
       return;
     }
 
@@ -60,12 +69,27 @@ export default function CategoryClient({ category }: { category: Category }) {
     setSelectedFilters({});
     setSelectedPriceRange(priceRange);
     setInStockOnly(false);
+    setVeryLimitedStockOnly(false);
   };
 
   const filteredProducts = useMemo(() => {
     return products.filter((product) => {
-      // 1. In Stock Check
-      if (activeInStockOnly && product.stock <= 0) return false;
+      // 1. Stock Checks
+      const totalStock = product.variants && product.variants.length > 0 
+        ? product.variants.reduce((acc, v) => acc + (v.stock_quantity || 0), 0)
+        : (product.stock || 0);
+        
+      const quantityInCart = product.variants && product.variants.length > 0
+        ? product.variants.reduce((acc, v) => {
+            const item = cartItems.find(i => i.productId === product.id && i.variantId === v.id);
+            return acc + (item ? item.quantity : 0);
+          }, 0)
+        : (cartItems.find(i => i.productId === product.id)?.quantity || 0);
+
+      const availableStock = totalStock - quantityInCart;
+
+      if (activeInStockOnly && availableStock <= 0) return false;
+      if (activeVeryLimitedStockOnly && (availableStock <= 0 || availableStock >= 5)) return false;
 
       // 2. Product-level Filters (Brand, Custom Attributes)
       for (const [slug, values] of Object.entries(activeFilters)) {
@@ -113,7 +137,7 @@ export default function CategoryClient({ category }: { category: Category }) {
 
       return true;
     });
-  }, [products, activeInStockOnly, activeFilters, activePriceRange]);
+  }, [products, activeInStockOnly, activeVeryLimitedStockOnly, activeFilters, activePriceRange, cartItems]);
 
   // Active Chips
   const activeChips: { slug: string; value: string | number; label: string }[] = [];
@@ -154,7 +178,7 @@ export default function CategoryClient({ category }: { category: Category }) {
         </div>
 
         {/* Active Filters */}
-        {(activeChips.length > 0 || selectedPriceRange.min > priceRange.min || selectedPriceRange.max < priceRange.max || inStockOnly) && (
+        {(activeChips.length > 0 || selectedPriceRange.min > priceRange.min || selectedPriceRange.max < priceRange.max || inStockOnly || veryLimitedStockOnly) && (
           <div className="flex flex-wrap items-center gap-2 mt-2">
             <span className="text-xs text-gray-400 mr-2 uppercase tracking-wider font-semibold">Active:</span>
             
@@ -162,7 +186,7 @@ export default function CategoryClient({ category }: { category: Category }) {
               <button
                 key={`${chip.slug}-${chip.value}`}
                 onClick={() => clearFilter(chip.slug, chip.value)}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm rounded-full transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#002366]/5 hover:bg-[#002366]/10 border border-[#002366]/10 text-[#002366] font-medium text-[13px] rounded-full transition-colors"
               >
                 {chip.label}
                 <X className="w-3 h-3 text-gray-500" />
@@ -172,7 +196,7 @@ export default function CategoryClient({ category }: { category: Category }) {
             {(selectedPriceRange.min > priceRange.min || selectedPriceRange.max < priceRange.max) && (
               <button
                 onClick={() => setSelectedPriceRange(priceRange)}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm rounded-full transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#002366]/5 hover:bg-[#002366]/10 border border-[#002366]/10 text-[#002366] font-medium text-[13px] rounded-full transition-colors"
               >
                 {formatPrice(selectedPriceRange.min)} - {formatPrice(selectedPriceRange.max)} MAD
                 <X className="w-3 h-3 text-gray-500" />
@@ -182,9 +206,19 @@ export default function CategoryClient({ category }: { category: Category }) {
             {inStockOnly && (
               <button
                 onClick={() => setInStockOnly(false)}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm rounded-full transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#002366]/5 hover:bg-[#002366]/10 border border-[#002366]/10 text-[#002366] font-medium text-[13px] rounded-full transition-colors"
               >
                 In Stock
+                <X className="w-3 h-3 text-gray-500" />
+              </button>
+            )}
+
+            {veryLimitedStockOnly && (
+              <button
+                onClick={() => setVeryLimitedStockOnly(false)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#002366]/5 hover:bg-[#002366]/10 border border-[#002366]/10 text-[#002366] font-medium text-[13px] rounded-full transition-colors"
+              >
+                Very Limited Stock
                 <X className="w-3 h-3 text-gray-500" />
               </button>
             )}
@@ -204,11 +238,11 @@ export default function CategoryClient({ category }: { category: Category }) {
         <div 
           className={`transition-all duration-500 ease-in-out origin-left flex-shrink-0 ${
             isSidebarOpen 
-              ? "w-full lg:w-56 opacity-100 translate-x-0" 
+              ? "w-full lg:w-[260px] opacity-100 translate-x-0" 
               : "w-0 opacity-0 -translate-x-full overflow-hidden absolute lg:static"
           }`}
         >
-          <div className="w-full lg:w-56 sticky top-24 max-h-[calc(100vh-120px)] overflow-y-auto overflow-x-hidden pr-4 pb-8 custom-scrollbar">
+          <div className="w-full lg:w-[260px] sticky top-24 max-h-[calc(100vh-120px)] overflow-y-auto overflow-x-hidden p-5 bg-[#f8f9fa] rounded-2xl border border-gray-100 custom-scrollbar">
             <SidebarFilter
               filters={filtersDef}
               priceRange={priceRange}
@@ -218,6 +252,8 @@ export default function CategoryClient({ category }: { category: Category }) {
               onPriceChange={setSelectedPriceRange}
               inStockOnly={inStockOnly}
               onInStockChange={setInStockOnly}
+              veryLimitedStockOnly={veryLimitedStockOnly}
+              onVeryLimitedStockChange={setVeryLimitedStockOnly}
             />
           </div>
         </div>

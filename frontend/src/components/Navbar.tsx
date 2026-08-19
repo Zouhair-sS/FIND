@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import { ChevronRight } from "lucide-react";
 
 import { getImageUrl, type Product } from "@/lib/api";
 import { useCart } from "./CartContext";
@@ -17,7 +18,33 @@ const NAV_LINKS = [
   { label: "Laptops", href: "/laptops" },
   { label: "Smartphones", href: "/smartphones" },
   { label: "Monitors", href: "/monitors" },
-  { label: "Accessories", href: "/accessories" },
+];
+
+const ACCESSORIES_SUBCATEGORIES = [
+  {
+    label: "Headphones & Earbuds",
+    href: "/headphones-earbuds",
+    icon: "/images/UI/headphones.png",
+    desc: "Wireless, ANC & more"
+  },
+  {
+    label: "Mouses",
+    href: "/mice",
+    icon: "/images/UI/mouse.png",
+    desc: "Gaming & productivity"
+  },
+  {
+    label: "Keyboards",
+    href: "/keyboards",
+    icon: "/images/UI/keyboard(1).png",
+    desc: "Mechanical & wireless"
+  },
+  {
+    label: "Smartwatches",
+    href: "/accessories-smartwatches",
+    icon: "/images/UI/smartwatch.png",
+    desc: "Apple Watch, Galaxy & more"
+  },
 ];
 
 const placeholders = ["what are you looking for ?", "iphone 16", "macbook pro"];
@@ -28,6 +55,8 @@ export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [accessoriesOpen, setAccessoriesOpen] = useState(false);
+  const [accessoriesHideTimeout, setAccessoriesHideTimeout] = useState<ReturnType<typeof setTimeout> | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<Product[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -36,6 +65,15 @@ export default function Navbar() {
   const router = useRouter();
   const pathname = usePathname();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleAccessoriesEnter = () => {
+    if (accessoriesHideTimeout) clearTimeout(accessoriesHideTimeout);
+    setAccessoriesOpen(true);
+  };
+  const handleAccessoriesLeave = () => {
+    const t = setTimeout(() => setAccessoriesOpen(false), 150);
+    setAccessoriesHideTimeout(t);
+  };
 
   const [placeholderText, setPlaceholderText] = useState("");
   const [phIndex, setPhIndex] = useState(0);
@@ -184,6 +222,66 @@ export default function Navbar() {
                 </Link>
               </li>
             ))}
+            {/* Accessories with mega dropdown */}
+            <li
+              className="relative"
+              onMouseEnter={handleAccessoriesEnter}
+              onMouseLeave={handleAccessoriesLeave}
+            >
+              <Link
+                href="/accessories"
+                className={`text-sm transition-colors ${
+                  accessoriesOpen ? 'text-gray-900' : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Accessories
+              </Link>
+
+              {/* Apple-style Mega Dropdown */}
+              <div
+                style={{
+                  opacity: accessoriesOpen ? 1 : 0,
+                  transform: accessoriesOpen ? 'translateY(0) scale(1)' : 'translateY(-6px) scale(0.98)',
+                  pointerEvents: accessoriesOpen ? 'auto' : 'none',
+                  transition: 'opacity 0.22s cubic-bezier(0.4,0,0.2,1), transform 0.22s cubic-bezier(0.4,0,0.2,1)',
+                }}
+                className="absolute top-full left-1/2 -translate-x-1/2 mt-4 w-[480px] bg-white/80 backdrop-blur-2xl rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.12)] border border-white/60 p-5 z-[60]"
+                onMouseEnter={handleAccessoriesEnter}
+                onMouseLeave={handleAccessoriesLeave}
+              >
+                {/* Arrow pointer */}
+                <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-4 h-2 overflow-hidden">
+                  <div className="w-3 h-3 bg-white border-l border-t border-white/60 rotate-45 translate-y-1 mx-auto shadow-sm" />
+                </div>
+                <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-3 px-1">Accessories</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {ACCESSORIES_SUBCATEGORIES.map((sub) => (
+                    <Link
+                      key={sub.href}
+                      href={sub.href}
+                      className="flex items-start gap-3 p-3 rounded-xl hover:bg-gray-50/80 transition-all group"
+                    >
+                      <div className="w-9 h-9 flex-shrink-0 flex items-center justify-center mt-0.5 group-hover:scale-110 transition-transform">
+                        <Image src={sub.icon} alt={sub.label} width={36} height={36} className="object-contain" />
+                      </div>
+                      <div>
+                        <p className="text-[13px] font-semibold text-gray-800 group-hover:text-gray-900">{sub.label}</p>
+                        <p className="text-[11px] text-gray-400 mt-0.5">{sub.desc}</p>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+                <div className="mt-3 pt-3 border-t border-gray-100">
+                  <Link
+                    href="/accessories"
+                    className="flex items-center justify-center gap-1.5 text-[12px] font-medium text-gray-500 hover:text-gray-900 transition-colors py-1"
+                  >
+                    View all Accessories
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </Link>
+                </div>
+              </div>
+            </li>
           </ul>
         </div>
 
@@ -193,16 +291,16 @@ export default function Navbar() {
           <div ref={searchRef} className="relative hidden sm:flex items-center justify-end h-10" onKeyDown={handleKeyDown}>
             {/* Search trigger / input */}
             <div 
-              className={`flex items-center transition-all duration-300 overflow-hidden ${
+              className={`group flex items-center transition-all duration-300 ease-out overflow-hidden ${
                 searchOpen 
-                  ? 'w-[300px] px-4 py-2 rounded-full border-primary/30 bg-gray-50 focus-within:bg-white focus-within:border-primary shadow-sm cursor-text' 
-                  : 'w-10 h-10 rounded-full border-transparent bg-transparent hover:bg-gray-100 cursor-pointer justify-center'
+                  ? 'w-[320px] px-4 py-2.5 rounded-full border border-[#002366]/15 bg-white shadow-[0_8px_25px_rgba(0,35,102,0.08)] cursor-text' 
+                  : 'w-10 h-10 rounded-full border border-transparent bg-transparent hover:bg-gray-100/80 cursor-pointer justify-center'
               }`}
               onClick={() => {
                 if (!searchOpen) setSearchOpen(true);
               }}
             >
-              <svg className={`flex-shrink-0 transition-colors ${searchOpen ? 'w-4 h-4 text-gray-400' : 'w-5 h-5 text-gray-500 hover:text-gray-900'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className={`flex-shrink-0 transition-colors duration-300 ${searchOpen ? 'w-[18px] h-[18px] text-[#002366]/60' : 'w-5 h-5 text-gray-500 group-hover:text-[#002366]'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={searchOpen ? 2 : 1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
               
@@ -212,7 +310,7 @@ export default function Navbar() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder={placeholderText}
-                className={`flex-1 bg-transparent outline-none text-gray-900 placeholder:text-gray-400 transition-opacity duration-300 ${searchOpen ? 'opacity-100' : 'opacity-0 w-0 pointer-events-none'}`}
+                className={`bg-transparent outline-none text-[15px] text-gray-900 placeholder:text-gray-400 transition-all duration-300 ${searchOpen ? 'opacity-100 flex-1 ml-2.5' : 'opacity-0 w-0 flex-none ml-0 pointer-events-none'}`}
                 tabIndex={searchOpen ? 0 : -1}
               />
               
@@ -265,6 +363,7 @@ export default function Navbar() {
                               <div className="relative w-16 h-16 bg-white/60 rounded-lg shadow-sm border border-white/50 flex-shrink-0 flex items-center justify-center overflow-hidden">
                                 {displayImageUrl ? (
                                   <Image
+                                    unoptimized
                                     src={getImageUrl(displayImageUrl)}
                                     alt={product.name}
                                     fill
@@ -326,11 +425,25 @@ export default function Navbar() {
               className="p-2 text-gray-500 hover:text-gray-900 transition-colors flex items-center gap-2 cursor-pointer"
               onClick={() => setUserMenuOpen(!userMenuOpen)}
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
-              </svg>
-              {isAuthenticated && user && (
-                <span className="text-sm font-medium hidden sm:block">{user.name.split(" ")[0]}</span>
+              {isAuthenticated && user ? (
+                <>
+                  {user.profile_picture ? (
+                    <div className="w-8 h-8 rounded-full overflow-hidden border border-gray-200">
+                      <Image src={getImageUrl(user.profile_picture)} alt={user.name} width={32} height={32} className="object-cover w-full h-full" unoptimized />
+                    </div>
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white text-sm font-bold">
+                      {user.name.charAt(0)}
+                    </div>
+                  )}
+                  <span className="text-sm font-medium hidden sm:block">{user.name.split(" ")[0]}</span>
+                </>
+              ) : (
+                <>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+                  </svg>
+                </>
               )}
             </button>
 

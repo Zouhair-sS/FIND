@@ -118,42 +118,46 @@ export default function ColorPickerField({ value, onChange }: ColorPickerFieldPr
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-white flex items-center justify-between hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary shadow-sm"
+        className="w-full px-3 py-2 border border-gray-200/80 rounded-lg text-sm bg-white/50 backdrop-blur-sm flex items-center justify-between hover:bg-gray-50/80 hover:border-gray-300 transition-all focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary shadow-sm"
       >
-        <div className="flex items-center gap-3">
-          <span 
-            className="w-5 h-5 rounded-full border border-gray-200 block shadow-inner" 
-            style={{ backgroundColor: displayHex }} 
-          />
-          <span className={value ? "text-gray-900 font-medium" : "text-gray-400"}>
+        <div className="flex items-center gap-2.5">
+          {value ? (
+            <span 
+              className="w-4 h-4 rounded-full border border-black/10 shadow-sm" 
+              style={{ backgroundColor: displayHex }} 
+            />
+          ) : (
+            <div className="w-4 h-4 rounded-full border border-dashed border-gray-300" />
+          )}
+          <span className={value ? "text-gray-900 font-medium text-[13px]" : "text-gray-400 text-[13px]"}>
             {displayName}
           </span>
         </div>
-        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
       {isOpen && (
-        <div className="absolute z-50 top-full left-0 mt-2 w-[340px] bg-white border border-gray-100 rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[450px]">
-          <div className="p-4 border-b border-gray-100 sticky top-0 bg-white z-10">
+        <div className="absolute z-50 top-full left-0 mt-2 w-[280px] bg-white/95 backdrop-blur-xl border border-gray-100 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[400px] animate-in fade-in zoom-in-95 duration-200">
+          <div className="p-3 border-b border-gray-100/50 sticky top-0 bg-white/50 backdrop-blur-xl z-10">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
               <input 
                 ref={searchInputRef}
                 type="text"
                 placeholder="Search colors..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                className="w-full pl-9 pr-3 py-1.5 bg-gray-50/50 border border-gray-200/50 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all placeholder:text-gray-400"
               />
             </div>
           </div>
-          <div className="overflow-y-auto p-5 space-y-6">
+          <div className="overflow-y-auto p-4 space-y-6">
             {filteredCategories.length > 0 ? filteredCategories.map((category) => (
               <div key={category.name}>
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-widest mb-3">
+                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-3 px-1">
                   {category.name}
                 </label>
-                <div className="grid grid-cols-4 gap-3">
+                <div className="grid grid-cols-5 gap-y-3 gap-x-2">
                   {category.colors.map((color) => {
                     const isSelected = value.toLowerCase() === color.name.toLowerCase();
                     return (
@@ -164,23 +168,23 @@ export default function ColorPickerField({ value, onChange }: ColorPickerFieldPr
                           onChange(color.name);
                           setIsOpen(false);
                         }}
-                        className={`group flex flex-col items-center gap-2 p-2 rounded-xl transition-all ${
-                          isSelected ? 'bg-gray-100/80 ring-1 ring-gray-200' : 'hover:bg-gray-50'
-                        }`}
+                        className="group flex flex-col items-center gap-1.5 relative outline-none"
                         title={color.name}
                       >
                         <div className="relative">
                           <span 
-                            className="w-8 h-8 rounded-full border border-gray-200 block shadow-sm transition-transform group-hover:scale-110"
+                            className={`w-7 h-7 rounded-full border flex items-center justify-center transition-all duration-300 ${
+                              isSelected ? 'border-primary shadow-md scale-110' : 'border-black/5 hover:scale-110 hover:shadow-md'
+                            }`}
                             style={{ backgroundColor: color.hex }}
-                          />
-                          {isSelected && (
-                           <span className="absolute inset-0 flex items-center justify-center">
-                              <Check className={`w-4 h-4 ${['#ffffff', '#f4f4f4', '#f2f1ed', '#f9f6ef', '#f8f8f8', '#e8e8e8'].includes(color.hex) ? 'text-gray-900' : 'text-white'}`} strokeWidth={3} />
-                            </span>
-                          )}
+                          >
+                            {isSelected && (
+                              <Check className={`w-3.5 h-3.5 ${['#ffffff', '#f4f4f4', '#f2f1ed', '#f9f6ef', '#f8f8f8', '#e8e8e8'].includes(color.hex) ? 'text-gray-900' : 'text-white'}`} strokeWidth={3} />
+                            )}
+                          </span>
                         </div>
-                        <span className="text-[10px] font-medium text-gray-600 text-center leading-tight h-6 flex items-center justify-center">
+                        {/* Tooltip on hover */}
+                        <span className="absolute -top-7 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[10px] font-medium px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
                           {color.name}
                         </span>
                       </button>
@@ -189,8 +193,8 @@ export default function ColorPickerField({ value, onChange }: ColorPickerFieldPr
                 </div>
               </div>
             )) : (
-              <div className="py-8 text-center text-gray-500 text-sm">
-                No colors found for "{searchQuery}"
+              <div className="py-8 text-center text-gray-400 text-[13px]">
+                No colors match "{searchQuery}"
               </div>
             )}
           </div>

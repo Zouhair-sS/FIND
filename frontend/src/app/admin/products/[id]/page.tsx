@@ -21,6 +21,8 @@ import ColorPickerField from "@/components/admin/ColorPickerField";
 import BrandSelector from "@/components/admin/BrandSelector";
 import CategorySelector from "@/components/admin/CategorySelector";
 import CustomSelect from "@/components/admin/CustomSelect";
+import ConfirmModal from "@/components/admin/ConfirmModal";
+import { useToast } from "@/components/admin/Toast";
 import {
   ArrowLeft,
   Save,
@@ -33,6 +35,7 @@ import {
   ChevronDown,
   ChevronUp,
   Edit,
+  Copy,
   Loader2
 } from "lucide-react";
 import { formatPrice } from "@/lib/formatPrice";
@@ -52,10 +55,21 @@ export default function AdminProductEditor() {
   // Modals state
   const [addConfigModal, setAddConfigModal] = useState(false);
   const [addVariantModal, setAddVariantModal] = useState<number | null>(null);
-  const [newConfigData, setNewConfigData] = useState({ sku: '', price: '' });
-  const [newVariantData, setNewVariantData] = useState({ sku: '', price: '', stock: '0', color: '', storage_gb: '', ram_gb: '', processor: '' });
+  const [editVariantModal, setEditVariantModal] = useState<any>(null);
+  const [newConfigData, setNewConfigData] = useState({ price: '' });
+  const [newVariantData, setNewVariantData] = useState({ price: '', stock: '0', color: '', storage_gb: '', ram_gb: '', processor: '', product_image_id: '' });
+  const [editVariantData, setEditVariantData] = useState({ price: '', stock: '0', color: '', storage_gb: '', ram_gb: '', processor: '', product_image_id: '' });
+  const [modalConfig, setModalConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    isAlert?: boolean;
+    variant?: "danger" | "warning" | "info" | "success";
+    onConfirm?: () => void;
+  }>({ isOpen: false, title: "", message: "" });
 
   // Basic Info Form State
+  const [initialData, setInitialData] = useState<any>(null);
   const [formData, setFormData] = useState({
     name: "",
     brand_id: "",
@@ -64,6 +78,8 @@ export default function AdminProductEditor() {
     status: "draft",
     description: "",
   });
+
+  const { success, error: showError } = useToast();
 
   useEffect(() => {
     async function load() {
@@ -74,14 +90,16 @@ export default function AdminProductEditor() {
         ]);
         setGroup(prodRes);
         setMetadata(metaRes);
-        setFormData({
+        const initial = {
           name: prodRes.name || "",
           brand_id: prodRes.brand_id?.toString() || "",
           category_id: prodRes.category_id?.toString() || "",
           series_id: prodRes.series_id?.toString() || "",
           status: prodRes.status || "draft",
           description: prodRes.description || "",
-        });
+        };
+        setFormData(initial);
+        setInitialData(initial);
         
         // Expand first config by default
         if (prodRes.configurations?.length > 0) {
@@ -96,21 +114,23 @@ export default function AdminProductEditor() {
     load();
   }, [id]);
 
-  const handleSaveBasicInfo = async () => {
-    setSaving(true);
-    try {
-      if (!window.confirm("Updating these fields will affect all configurations for this product. Continue?")) {
-        return;
+  // Auto-save basic info
+  useEffect(() => {
+    if (!initialData || !group?.group_id) return;
+    const isChanged = JSON.stringify(formData) !== JSON.stringify(initialData);
+    if (!isChanged) return;
+
+    const delay = setTimeout(async () => {
+      try {
+        await updateAdminProduct(group.group_id, formData);
+        setInitialData(formData);
+        success("Changes saved");
+      } catch (err) {
+        showError("Failed to save changes");
       }
-      const res = await updateAdminProduct(group.group_id, formData);
-      alert(res.message || "Product updated");
-    } catch (err) {
-      console.error(err);
-      alert("Failed to update product");
-    } finally {
-      setSaving(false);
-    }
-  };
+    }, 2000);
+    return () => clearTimeout(delay);
+  }, [formData, initialData, group?.group_id, success, showError]);
 
   const toggleConfig = (configId: number) => {
     setExpandedConfigs(prev => ({ ...prev, [configId]: !prev[configId] }));
@@ -136,16 +156,43 @@ export default function AdminProductEditor() {
     return parts.join(' · ') || 'Standard Configuration';
   };
 
-  const handleDeleteVariant = async (variantId: number) => {
-    if (!window.confirm("Delete this variant?")) return;
-    try {
-      await deleteAdminVariant(variantId);
-      // reload
-      const prodRes = await fetchAdminProduct(id);
-      setGroup(prodRes);
-    } catch (err) {
-      console.error(err);
-    }
+  const handleDeleteVariant = (variantId: number) => {
+    setModalConfig({
+      isOpen: true,
+      title: "Delete Variant",
+      message: "Are you sure you want to delete this variant?",
+      variant: "danger",
+      onConfirm: async () => {
+        setModalConfig(prev => ({ ...prev, isOpen: false }));
+        try {
+          await deleteAdminVariant(variantId);
+          const prodRes = await fetchAdminProduct(id);
+          setGroup(prodRes);
+        } catch (err) {
+          console.error(err);
+        }
+      }
+    });
+  };
+
+  const handleDeleteConfiguration = (configId: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setModalConfig({
+      isOpen: true,
+      title: "Delete Configuration",
+      message: "Are you sure you want to delete this configuration and all its variants?",
+      variant: "danger",
+      onConfirm: async () => {
+        setModalConfig(prev => ({ ...prev, isOpen: false }));
+        try {
+          await deleteAdminConfiguration(configId);
+          const prodRes = await fetchAdminProduct(id);
+          setGroup(prodRes);
+        } catch (err) {
+          console.error(err);
+        }
+      }
+    });
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, configId: number) => {
@@ -155,59 +202,122 @@ export default function AdminProductEditor() {
       await uploadAdminProductImage(configId, file);
       const prodRes = await fetchAdminProduct(id);
       setGroup(prodRes);
+      success("Image uploaded");
     } catch (err) {
       console.error(err);
-      alert("Failed to upload image");
+      showError("Failed to upload image");
     }
     e.target.value = ''; // reset input
   };
 
-  const handleDeleteImage = async (imageId: number) => {
-    if (!window.confirm("Delete this image?")) return;
-    try {
-      await deleteAdminProductImage(imageId);
-      const prodRes = await fetchAdminProduct(id);
-      setGroup(prodRes);
-    } catch (err) {
-      console.error(err);
-      alert("Failed to delete image");
-    }
+  const handleDeleteImage = (imageId: number) => {
+    setModalConfig({
+      isOpen: true,
+      title: "Delete Image",
+      message: "Are you sure you want to delete this image?",
+      variant: "danger",
+      onConfirm: async () => {
+        setModalConfig(prev => ({ ...prev, isOpen: false }));
+        try {
+          await deleteAdminProductImage(imageId);
+          const prodRes = await fetchAdminProduct(id);
+          setGroup(prodRes);
+          success("Image deleted");
+        } catch (err) {
+          console.error(err);
+          showError("Failed to delete image");
+        }
+      }
+    });
   };
 
   const handleCreateConfig = async () => {
-    if (!newConfigData.sku || !newConfigData.price) return;
+    if (!newConfigData.price) return;
     try {
+      const generatedSku = `CFG-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
       await addAdminConfiguration(group.group_id, {
-        sku: newConfigData.sku,
-        variants: [{ sku: newConfigData.sku, price: Number(newConfigData.price), stock_quantity: 0 }]
+        sku: generatedSku,
+        variants: [{ sku: generatedSku, price: Number(newConfigData.price), stock_quantity: 0 }]
       });
       const prodRes = await fetchAdminProduct(id);
       setGroup(prodRes);
       setAddConfigModal(false);
-      setNewConfigData({ sku: '', price: '' });
+      setNewConfigData({ price: '' });
+      success("Configuration added");
     } catch (err) {
-      alert("Failed to create configuration");
+      showError("Failed to create configuration");
     }
   };
 
   const handleCreateVariant = async () => {
-    if (!addVariantModal || !newVariantData.sku || !newVariantData.price) return;
+    if (!addVariantModal || !newVariantData.price) return;
+    
+    // Check for duplicates
+    const config = group.configurations?.find((c: any) => c.id === addVariantModal);
+    if (config && config.variants) {
+      const isDuplicate = config.variants.some((v: any) => {
+        const sameColor = (v.color || '') === (newVariantData.color || '');
+        const sameStorage = String(v.storage_gb || '') === String(newVariantData.storage_gb || '');
+        const sameRam = String(v.ram_gb || '') === String(newVariantData.ram_gb || '');
+        const sameProcessor = (v.processor || '').toLowerCase() === (newVariantData.processor || '').toLowerCase();
+        
+        return sameColor && sameStorage && sameRam && sameProcessor;
+      });
+      
+      if (isDuplicate) {
+        setModalConfig({
+          isOpen: true,
+          title: "Duplicate Variant",
+          message: "A variant with these exact specifications already exists in this configuration.",
+          isAlert: true,
+          variant: "warning"
+        });
+        return;
+      }
+    }
+
     try {
+      const generatedSku = `VAR-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
       await createAdminVariant(addVariantModal, {
-        sku: newVariantData.sku,
+        sku: generatedSku,
         price: Number(newVariantData.price),
         stock_quantity: Number(newVariantData.stock),
         color: newVariantData.color,
         storage_gb: newVariantData.storage_gb ? Number(newVariantData.storage_gb) : null,
         ram_gb: newVariantData.ram_gb ? Number(newVariantData.ram_gb) : null,
         processor: newVariantData.processor,
+        product_image_id: newVariantData.product_image_id ? Number(newVariantData.product_image_id) : null,
       });
       const prodRes = await fetchAdminProduct(id);
       setGroup(prodRes);
       setAddVariantModal(null);
-      setNewVariantData({ sku: '', price: '', stock: '0', color: '', storage_gb: '', ram_gb: '', processor: '' });
+      setNewVariantData({ price: '', stock: '0', color: '', storage_gb: '', ram_gb: '', processor: '', product_image_id: '' });
+      success("Variant added");
     } catch (err) {
-      alert("Failed to create variant");
+      showError("Failed to create variant");
+    }
+  };
+
+  const handleUpdateVariant = async () => {
+    if (!editVariantModal || !editVariantData.price) return;
+
+    try {
+      await updateAdminVariant(editVariantModal.id, {
+        sku: editVariantModal.sku, // keep original sku
+        price: Number(editVariantData.price),
+        stock_quantity: Number(editVariantData.stock),
+        color: editVariantData.color,
+        storage_gb: editVariantData.storage_gb ? Number(editVariantData.storage_gb) : null,
+        ram_gb: editVariantData.ram_gb ? Number(editVariantData.ram_gb) : null,
+        processor: editVariantData.processor,
+        product_image_id: editVariantData.product_image_id ? Number(editVariantData.product_image_id) : null,
+      });
+      const prodRes = await fetchAdminProduct(id);
+      setGroup(prodRes);
+      setEditVariantModal(null);
+      success("Variant updated");
+    } catch (err) {
+      showError("Failed to update variant");
     }
   };
 
@@ -222,6 +332,10 @@ export default function AdminProductEditor() {
 
   return (
     <div className="p-6 lg:p-8 max-w-[1600px] mx-auto pb-32">
+      <ConfirmModal 
+        {...modalConfig} 
+        onClose={() => setModalConfig(prev => ({ ...prev, isOpen: false }))} 
+      />
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-4">
@@ -328,15 +442,8 @@ export default function AdminProductEditor() {
                   </div>
                 </div>
 
-                <div className="pt-4 border-t border-gray-100 flex justify-end">
-                  <button
-                    onClick={handleSaveBasicInfo}
-                    disabled={saving}
-                    className="inline-flex items-center gap-2 bg-gray-900 text-white px-4 py-2 rounded-lg text-[13px] font-medium hover:bg-gray-800 transition-colors disabled:opacity-50"
-                  >
-                    <Save className="w-4 h-4" />
-                    {saving ? 'Saving...' : 'Save Overview'}
-                  </button>
+                <div className="pt-4 flex justify-between items-center text-[12px] text-gray-500">
+                  <p>Changes to these fields are saved automatically.</p>
                 </div>
               </div>
             )}
@@ -361,6 +468,15 @@ export default function AdminProductEditor() {
                         </div>
                         <div className="flex items-center gap-3">
                           <span className="text-[12px] font-medium text-gray-400">{config.variants?.length} variants</span>
+                          <button 
+                            onClick={(e) => handleDeleteConfiguration(config.id, e)}
+                            className="w-6 h-6 rounded flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                            title="Delete Configuration"
+                          >
+                            <div className="relative w-3.5 h-3.5 opacity-60 group-hover:opacity-100">
+                              <Image src="/images/UI/trash-bin.png" alt="Delete" fill className="object-contain" />
+                            </div>
+                          </button>
                           {isExpanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
                         </div>
                       </div>
@@ -374,6 +490,7 @@ export default function AdminProductEditor() {
                                 <th className="pb-3 font-medium">Variant</th>
                                 <th className="pb-3 font-medium">Price (MAD)</th>
                                 <th className="pb-3 font-medium">Stock</th>
+                                <th className="pb-3 font-medium">Image</th>
                                 <th className="pb-3 font-medium">SKU</th>
                                 <th className="pb-3 font-medium text-right">Actions</th>
                               </tr>
@@ -385,24 +502,102 @@ export default function AdminProductEditor() {
                                     <span className="text-[13px] font-medium text-gray-900">{getVariantLabel(v)}</span>
                                   </td>
                                   <td className="py-3 pr-4">
-                                    <span className="text-[13px] text-gray-600">{Number(v.price).toLocaleString()}</span>
+                                    <input 
+                                      type="number"
+                                      defaultValue={v.price}
+                                      onBlur={async (e) => {
+                                        if (e.target.value && e.target.value !== v.price?.toString()) {
+                                          try {
+                                            await updateAdminVariant(v.id, { ...v, price: Number(e.target.value) });
+                                            success("Price updated");
+                                            const prodRes = await fetchAdminProduct(id);
+                                            setGroup(prodRes);
+                                          } catch (err) {
+                                            showError("Failed to update price");
+                                            e.target.value = v.price;
+                                          }
+                                        }
+                                      }}
+                                      className="w-24 px-2 py-1 border border-transparent hover:border-gray-200 focus:border-primary focus:ring-1 focus:ring-primary rounded text-[13px] text-gray-900 bg-transparent focus:bg-white transition-all -ml-2"
+                                    />
                                   </td>
                                   <td className="py-3 pr-4">
-                                    <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded text-[12px] font-medium ${
-                                      v.stock_quantity > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
-                                    }`}>
-                                      {v.stock_quantity}
-                                    </span>
+                                    <input 
+                                      type="number"
+                                      defaultValue={v.stock_quantity}
+                                      onBlur={async (e) => {
+                                        if (e.target.value && e.target.value !== v.stock_quantity?.toString()) {
+                                          try {
+                                            await updateAdminVariant(v.id, { ...v, stock_quantity: Number(e.target.value) });
+                                            success("Stock updated");
+                                            const prodRes = await fetchAdminProduct(id);
+                                            setGroup(prodRes);
+                                          } catch (err) {
+                                            showError("Failed to update stock");
+                                            e.target.value = v.stock_quantity;
+                                          }
+                                        }
+                                      }}
+                                      className={`w-20 px-2 py-1 border border-transparent hover:border-gray-200 focus:border-primary focus:ring-1 focus:ring-primary rounded text-[13px] font-medium bg-transparent focus:bg-white transition-all -ml-2 ${
+                                        v.stock_quantity > 0 ? 'text-emerald-700' : 'text-red-700'
+                                      }`}
+                                    />
+                                  </td>
+                                  <td className="py-3 pr-4">
+                                    {v.product_image_id && config.images?.find((i:any) => i.id === v.product_image_id) ? (
+                                      <div className="w-8 h-8 rounded bg-gray-50 border border-gray-200 overflow-hidden relative">
+                                        <Image unoptimized src={getImageUrl(config.images.find((i:any) => i.id === v.product_image_id).url)} alt="" fill className="object-contain" />
+                                      </div>
+                                    ) : (
+                                      <span className="text-[12px] text-gray-400">—</span>
+                                    )}
                                   </td>
                                   <td className="py-3 pr-4">
                                     <span className="text-[12px] font-mono text-gray-500">{v.sku}</span>
                                   </td>
                                   <td className="py-3 text-right">
-                                    <button className="text-gray-400 hover:text-primary transition-colors p-1" title="Edit (Coming Soon)">
-                                      <Edit className="w-4 h-4" />
+                                    <button 
+                                      onClick={() => {
+                                        setAddVariantModal(config.id);
+                                        setNewVariantData({
+                                          price: v.price?.toString() || '',
+                                          stock: '0',
+                                          color: v.color || '',
+                                          storage_gb: v.storage_gb?.toString() || '',
+                                          ram_gb: v.ram_gb?.toString() || '',
+                                          processor: v.processor || '',
+                                          product_image_id: v.product_image_id?.toString() || ''
+                                        });
+                                      }}
+                                      className="text-gray-400 hover:text-primary transition-colors p-1" 
+                                      title="Duplicate"
+                                    >
+                                      <Copy className="w-4 h-4" />
+                                    </button>
+                                    <button 
+                                      onClick={() => {
+                                        setEditVariantModal(v);
+                                        setEditVariantData({
+                                          price: v.price?.toString() || '',
+                                          stock: v.stock_quantity?.toString() || '0',
+                                          color: v.color || '',
+                                          storage_gb: v.storage_gb?.toString() || '',
+                                          ram_gb: v.ram_gb?.toString() || '',
+                                          processor: v.processor || '',
+                                          product_image_id: v.product_image_id?.toString() || ''
+                                        });
+                                      }}
+                                      className="text-gray-400 hover:text-primary transition-colors p-1 ml-1" 
+                                      title="Edit"
+                                    >
+                                      <div className="relative w-4 h-4 opacity-60 hover:opacity-100">
+                                        <Image src="/images/UI/pencil(1).png" alt="Edit" fill className="object-contain" />
+                                      </div>
                                     </button>
                                     <button onClick={() => handleDeleteVariant(v.id)} className="text-gray-400 hover:text-red-500 transition-colors p-1 ml-1" title="Delete">
-                                      <Trash2 className="w-4 h-4" />
+                                      <div className="relative w-4 h-4 opacity-60 hover:opacity-100">
+                                        <Image src="/images/UI/trash-bin.png" alt="Delete" fill className="object-contain" />
+                                      </div>
                                     </button>
                                   </td>
                                 </tr>
@@ -444,12 +639,17 @@ export default function AdminProductEditor() {
                             <Image unoptimized src={getImageUrl(img.url)} alt="" fill className="object-contain p-2" sizes="200px" />
                             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-2">
                               <div className="flex justify-end">
-                                <button 
-                                  onClick={() => handleDeleteImage(img.id)}
-                                  className="w-7 h-7 bg-white/20 hover:bg-red-500 rounded text-white flex items-center justify-center transition-colors"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
+                                <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDeleteImage(img.id);
+                                      }}
+                                      className="w-6 h-6 rounded-md bg-white/90 text-red-500 shadow-sm flex items-center justify-center hover:bg-red-50 transition-colors"
+                                    >
+                                      <div className="relative w-3.5 h-3.5">
+                                        <Image src="/images/UI/trash-bin.png" alt="Delete" fill className="object-contain" />
+                                      </div>
+                                    </button>
                               </div>
                               <span className="text-[10px] font-medium text-white bg-black/50 px-1.5 py-0.5 rounded w-fit">Order: {img.sort_order}</span>
                             </div>
@@ -562,16 +762,6 @@ export default function AdminProductEditor() {
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-[12px] font-medium text-gray-700 mb-1.5">Base SKU</label>
-                <input
-                  type="text"
-                  value={newConfigData.sku}
-                  onChange={(e) => setNewConfigData({...newConfigData, sku: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[13px] focus:ring-2 focus:ring-primary/20 focus:border-primary font-mono"
-                  placeholder="e.g. SAM-S26U-256GB"
-                />
-              </div>
-              <div>
                 <label className="block text-[12px] font-medium text-gray-700 mb-1.5">Price (MAD)</label>
                 <input
                   type="number"
@@ -600,10 +790,6 @@ export default function AdminProductEditor() {
             </div>
             <div className="p-6 grid grid-cols-2 gap-4">
               <div className="col-span-2 sm:col-span-1">
-                <label className="block text-[12px] font-medium text-gray-700 mb-1.5">SKU</label>
-                <input type="text" value={newVariantData.sku} onChange={(e) => setNewVariantData({...newVariantData, sku: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[13px] font-mono" />
-              </div>
-              <div className="col-span-2 sm:col-span-1">
                 <label className="block text-[12px] font-medium text-gray-700 mb-1.5">Price (MAD)</label>
                 <input type="number" value={newVariantData.price} onChange={(e) => setNewVariantData({...newVariantData, price: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[13px]" />
               </div>
@@ -611,34 +797,174 @@ export default function AdminProductEditor() {
                 <label className="block text-[12px] font-medium text-gray-700 mb-1.5">Stock</label>
                 <input type="number" value={newVariantData.stock} onChange={(e) => setNewVariantData({...newVariantData, stock: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[13px]" />
               </div>
-              <div className="col-span-2 sm:col-span-1">
+              <div className="col-span-2">
                 <label className="block text-[12px] font-medium text-gray-700 mb-1.5">Color</label>
                 <ColorPickerField 
                   value={newVariantData.color} 
                   onChange={(val) => setNewVariantData({...newVariantData, color: val})} 
                 />
               </div>
+              {(() => {
+                const catName = group?.category?.name?.toLowerCase() || "";
+                const isLaptop = catName.includes('laptop');
+                const isPhone = catName.includes('phone') || catName.includes('smartphone');
+                if (!isLaptop && !isPhone) return null;
+
+                return (
+                  <div className="col-span-2 border-t border-gray-100 pt-3 mt-1">
+                    <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wider mb-3">Tech Specs</p>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-medium text-gray-600 mb-1">Storage (GB)</label>
+                        <input type="number" value={newVariantData.storage_gb} onChange={(e) => setNewVariantData({...newVariantData, storage_gb: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[13px]" />
+                      </div>
+                      {isLaptop && (
+                        <>
+                          <div>
+                            <label className="block text-[11px] font-medium text-gray-600 mb-1">RAM (GB)</label>
+                            <input type="number" value={newVariantData.ram_gb} onChange={(e) => setNewVariantData({...newVariantData, ram_gb: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[13px]" />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-medium text-gray-600 mb-1">Processor</label>
+                            <input type="text" value={newVariantData.processor} onChange={(e) => setNewVariantData({...newVariantData, processor: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[13px]" />
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
               <div className="col-span-2 border-t border-gray-100 pt-3 mt-1">
-                <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wider mb-3">Tech Specs</p>
-                <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-medium text-gray-600 mb-1">Storage (GB)</label>
-                    <input type="number" value={newVariantData.storage_gb} onChange={(e) => setNewVariantData({...newVariantData, storage_gb: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[13px]" />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-medium text-gray-600 mb-1">RAM (GB)</label>
-                    <input type="number" value={newVariantData.ram_gb} onChange={(e) => setNewVariantData({...newVariantData, ram_gb: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[13px]" />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-medium text-gray-600 mb-1">Processor</label>
-                    <input type="text" value={newVariantData.processor} onChange={(e) => setNewVariantData({...newVariantData, processor: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[13px]" />
-                  </div>
-                </div>
+                <label className="block text-[11px] font-medium text-gray-600 mb-2">Variant Image</label>
+                {(() => {
+                  const currentConfig = group.configurations?.find((c:any) => c.id === addVariantModal);
+                  if (!currentConfig || !currentConfig.images || currentConfig.images.length === 0) {
+                    return <p className="text-[12px] text-gray-500">No images available in this configuration. Upload images in the Images tab first.</p>;
+                  }
+                  return (
+                    <div className="flex gap-3 overflow-x-auto pb-2">
+                      <div 
+                        onClick={() => setNewVariantData({...newVariantData, product_image_id: ''})}
+                        className={`w-12 h-12 flex-shrink-0 rounded-lg border-2 flex items-center justify-center cursor-pointer transition-all ${
+                          !newVariantData.product_image_id ? 'border-primary bg-primary/5 text-primary' : 'border-gray-200 bg-gray-50 text-gray-400 hover:border-gray-300'
+                        }`}
+                      >
+                        <span className="text-[10px] font-medium">None</span>
+                      </div>
+                      {currentConfig.images.map((img:any) => (
+                        <div 
+                          key={img.id}
+                          onClick={() => setNewVariantData({...newVariantData, product_image_id: img.id.toString()})}
+                          className={`w-12 h-12 flex-shrink-0 rounded-lg border-2 cursor-pointer transition-all overflow-hidden relative ${
+                            newVariantData.product_image_id === img.id.toString() ? 'border-primary shadow-sm' : 'border-transparent hover:border-gray-300'
+                          }`}
+                        >
+                          <Image unoptimized src={getImageUrl(img.url)} alt="" fill className="object-cover" />
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
             <div className="px-6 py-4 bg-gray-50 flex justify-end gap-3 border-t border-gray-100">
               <button onClick={() => setAddVariantModal(null)} className="px-4 py-2 text-[13px] font-medium text-gray-600 hover:text-gray-900">Cancel</button>
               <button onClick={handleCreateVariant} className="px-4 py-2 bg-gray-900 text-white rounded-lg text-[13px] font-medium hover:bg-gray-800">Add Variant</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Variant Modal */}
+      {editVariantModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg">
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="text-[15px] font-bold text-gray-900">Edit Variant</h3>
+              <button onClick={() => setEditVariantModal(null)} className="text-gray-400 hover:text-gray-600">×</button>
+            </div>
+            <div className="p-6 grid grid-cols-2 gap-4">
+              <div className="col-span-2 sm:col-span-1">
+                <label className="block text-[12px] font-medium text-gray-700 mb-1.5">Price (MAD)</label>
+                <input type="number" value={editVariantData.price} onChange={(e) => setEditVariantData({...editVariantData, price: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[13px]" />
+              </div>
+              <div className="col-span-2 sm:col-span-1">
+                <label className="block text-[12px] font-medium text-gray-700 mb-1.5">Stock</label>
+                <input type="number" value={editVariantData.stock} onChange={(e) => setEditVariantData({...editVariantData, stock: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[13px]" />
+              </div>
+              <div className="col-span-2">
+                <label className="block text-[12px] font-medium text-gray-700 mb-1.5">Color</label>
+                <ColorPickerField 
+                  value={editVariantData.color} 
+                  onChange={(val) => setEditVariantData({...editVariantData, color: val})} 
+                />
+              </div>
+              {(() => {
+                const catName = group?.category?.name?.toLowerCase() || "";
+                const isLaptop = catName.includes('laptop');
+                const isPhone = catName.includes('phone') || catName.includes('smartphone');
+                if (!isLaptop && !isPhone) return null;
+
+                return (
+                  <div className="col-span-2 border-t border-gray-100 pt-3 mt-1">
+                    <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wider mb-3">Tech Specs</p>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-medium text-gray-600 mb-1">Storage (GB)</label>
+                        <input type="number" value={editVariantData.storage_gb} onChange={(e) => setEditVariantData({...editVariantData, storage_gb: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[13px]" />
+                      </div>
+                      {isLaptop && (
+                        <>
+                          <div>
+                            <label className="block text-[11px] font-medium text-gray-600 mb-1">RAM (GB)</label>
+                            <input type="number" value={editVariantData.ram_gb} onChange={(e) => setEditVariantData({...editVariantData, ram_gb: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[13px]" />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-medium text-gray-600 mb-1">Processor</label>
+                            <input type="text" value={editVariantData.processor} onChange={(e) => setEditVariantData({...editVariantData, processor: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[13px]" />
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+              <div className="col-span-2 border-t border-gray-100 pt-3 mt-1">
+                <label className="block text-[11px] font-medium text-gray-600 mb-2">Variant Image</label>
+                {(() => {
+                  const currentConfig = group.configurations?.find((c:any) => c.variants.some((v:any) => v.id === editVariantModal.id));
+                  if (!currentConfig || !currentConfig.images || currentConfig.images.length === 0) {
+                    return <p className="text-[12px] text-gray-500">No images available in this configuration. Upload images in the Images tab first.</p>;
+                  }
+                  return (
+                    <div className="flex gap-3 overflow-x-auto pb-2">
+                      <div 
+                        onClick={() => setEditVariantData({...editVariantData, product_image_id: ''})}
+                        className={`w-12 h-12 flex-shrink-0 rounded-lg border-2 flex items-center justify-center cursor-pointer transition-all ${
+                          !editVariantData.product_image_id ? 'border-primary bg-primary/5 text-primary' : 'border-gray-200 bg-gray-50 text-gray-400 hover:border-gray-300'
+                        }`}
+                      >
+                        <span className="text-[10px] font-medium">None</span>
+                      </div>
+                      {currentConfig.images.map((img:any) => (
+                        <div 
+                          key={img.id}
+                          onClick={() => setEditVariantData({...editVariantData, product_image_id: img.id.toString()})}
+                          className={`w-12 h-12 flex-shrink-0 rounded-lg border-2 cursor-pointer transition-all overflow-hidden relative ${
+                            editVariantData.product_image_id === img.id.toString() ? 'border-primary shadow-sm' : 'border-transparent hover:border-gray-300'
+                          }`}
+                        >
+                          <Image unoptimized src={getImageUrl(img.url)} alt="" fill className="object-cover" />
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+            <div className="px-6 py-4 bg-gray-50 flex justify-end gap-3 border-t border-gray-100">
+              <button onClick={() => setEditVariantModal(null)} className="px-4 py-2 text-[13px] font-medium text-gray-600 hover:text-gray-900">Cancel</button>
+              <button onClick={handleUpdateVariant} className="px-4 py-2 bg-gray-900 text-white rounded-lg text-[13px] font-medium hover:bg-gray-800">Save Changes</button>
             </div>
           </div>
         </div>

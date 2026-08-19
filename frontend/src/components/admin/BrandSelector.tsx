@@ -14,12 +14,28 @@ interface BrandSelectorProps {
 }
 
 const BRAND_LOGOS: Record<string, string> = {
-  "Apple": "/images/LOGOS/Brands/apple logo.svg",
-  "Samsung": "/images/LOGOS/Brands/samsung.svg",
-  "Google": "/images/LOGOS/Brands/Google.svg",
-  "Lenovo": "/images/LOGOS/Brands/lenovo.svg",
-  "Dell": "/images/LOGOS/Brands/dell.svg",
-  "ASUS": "/images/LOGOS/Brands/Rog strix.png",
+  "Apple":            "/images/LOGOS/Brands/apple logo.svg",
+  "Samsung":          "/images/LOGOS/Brands/samsung.svg",
+  "Google":           "/images/LOGOS/Brands/Google.svg",
+  "Lenovo":           "/images/LOGOS/Brands/lenovo.svg",
+  "Dell":             "/images/LOGOS/Brands/dell.svg",
+  "ASUS":             "/images/LOGOS/Brands/Rog strix.png",
+  "ROG Strix":        "/images/LOGOS/Brands/Rog strix.png",
+  "Samsung Odyssey":  "/images/LOGOS/Brands/Samsung_Odyssey.svg",
+  "Beats":            "/images/LOGOS/Brands/beats-electronics.svg",
+  "Bose":             "/images/LOGOS/Brands/bose.svg",
+  "Gigabyte":         "/images/LOGOS/Brands/gigabyte-technology-logo-2008.svg",
+  "HP":               "/images/LOGOS/Brands/hp.svg",
+  "Huawei":           "/images/LOGOS/Brands/huawei-pure-.svg",
+  "JBL":              "/images/LOGOS/Brands/jbl-2.svg",
+  "LG":               "/images/LOGOS/Brands/lg-electronics.svg",
+  "Logitech":         "/images/LOGOS/Brands/logitech-gaming-2.svg",
+  "Microsoft":        "/images/LOGOS/Brands/microsoft-5.svg",
+  "MSI":              "/images/LOGOS/Brands/msi-3.svg",
+  "Razer":            "/images/LOGOS/Brands/razer.svg",
+  "Sony":             "/images/LOGOS/Brands/sony-logo-1.svg",
+  "Soundcore":        "/images/LOGOS/Brands/soundcore.svg",
+  "Xiaomi":           "/images/LOGOS/Brands/xiaomi-logo-2.svg",
 };
 
 export default function BrandSelector({ value, onChange, brands = [] }: BrandSelectorProps) {
