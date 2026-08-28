@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { fetchAdminCategories, createAdminCategory, updateAdminCategory, deleteAdminCategory, fetchAdminBrands } from "@/lib/api";
-import { FolderTree, Plus, Search, Edit, Trash2, CheckSquare, X, Check } from "lucide-react";
+import { FolderTree, Plus, Search, Edit, Trash2, CheckSquare, X, Check, ChevronDown, ChevronRight } from "lucide-react";
 import ConfirmModal from "@/components/admin/ConfirmModal";
 import { AnimatePresence, motion } from "framer-motion";
 
@@ -168,6 +168,17 @@ export default function AdminCategories() {
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
+  const [collapsedCategories, setCollapsedCategories] = useState<Set<number>>(new Set());
+
+  const toggleCollapse = (id: number) => {
+    setCollapsedCategories(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) newSet.delete(id);
+      else newSet.add(id);
+      return newSet;
+    });
+  };
+
   const loadCategories = () => {
     setLoading(true);
     Promise.all([fetchAdminCategories(), fetchAdminBrands()])
@@ -235,11 +246,14 @@ export default function AdminCategories() {
     });
     
     const display: any[] = [];
-    const flatten = (nodes: any[], level = 0) => {
+    const flatten = (nodes: any[], level = 0, isHidden = false) => {
       nodes.forEach(n => {
-        display.push({ ...n, level });
-        if (n.children && n.children.length > 0) {
-          flatten(n.children, level + 1);
+        const hasChildren = n.children && n.children.length > 0;
+        if (!isHidden) {
+          display.push({ ...n, level, hasChildren });
+        }
+        if (hasChildren) {
+          flatten(n.children, level + 1, isHidden || collapsedCategories.has(n.id));
         }
       });
     };
@@ -248,7 +262,7 @@ export default function AdminCategories() {
   };
 
   const filtered = search 
-    ? categories.filter(c => c.name?.toLowerCase().includes(search.toLowerCase())).map(c => ({...c, level: 0}))
+    ? categories.filter(c => c.name?.toLowerCase().includes(search.toLowerCase())).map(c => ({...c, level: 0, hasChildren: false}))
     : buildTree(categories);
 
   const toggleSelectAll = () => {
@@ -333,19 +347,31 @@ export default function AdminCategories() {
 
       <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden flex flex-col">
         <div className="p-4 border-b border-gray-100 flex flex-col sm:flex-row gap-4 items-center justify-between bg-gray-50/50">
-          <div className="relative w-full sm:w-[320px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
+          <div className="flex-1">
+            <div className="px-1 flex items-baseline gap-2">
+              <h2 className="text-[16px] font-bold text-gray-900 tracking-wide uppercase">
+                {categories.filter(c => !c.parent_id).length} ACTIVE CATEGORIES
+              </h2>
+              <span className="text-[12px] text-gray-500 font-medium">
+                {categories.filter(c => c.parent_id).length} subcategories
+              </span>
+            </div>
+          </div>
+          <div className="w-full sm:w-[320px]">
+            <div className="relative w-full group">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-primary transition-colors" />
+              <input
               type="text"
               placeholder="Search categories..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 text-[13px] border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all bg-white"
+              className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-full text-[13px] focus:outline-none focus:border-primary/30 focus:shadow-[0_4px_15px_rgba(0,35,102,0.05)] transition-all duration-300 placeholder:text-gray-400"
             />
+            </div>
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="overflow-auto max-h-[calc(100vh-250px)] relative">
           {loading ? (
             <div className="p-8 flex items-center justify-center h-40">
               <div className="w-5 h-5 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
@@ -359,24 +385,24 @@ export default function AdminCategories() {
               <p className="text-[13px] text-gray-500 mt-1">Try adjusting your search or create a new one.</p>
             </div>
           ) : (
-            <table className="w-full text-left border-collapse">
+            <table className="w-full text-left border-separate border-spacing-0 table-fixed">
               <thead>
-                <tr className="bg-gray-50/50">
+                <tr className="text-[11px] text-gray-400 uppercase tracking-wider">
                   {selectionMode && (
-                    <th className="px-5 py-3.5 w-[50px] border-y border-gray-100">
+                    <th className="px-5 py-3.5 w-[50px] bg-gray-50 sticky top-0 z-20 border-b border-gray-100 shadow-sm">
                       <button 
                         onClick={toggleSelectAll}
-                        className={`w-4 h-4 rounded flex items-center justify-center transition-colors border ${selectedIds.size === filtered.length && filtered.length > 0 ? 'bg-primary border-primary text-white' : 'border-gray-300 hover:border-primary'}`}
+                        className={`w-4 h-4 rounded flex items-center justify-center transition-colors border ${selectedIds.size === filtered.length && filtered.length > 0 ? 'bg-gray-900 border-gray-900 text-white' : 'border-gray-300 hover:border-gray-900'}`}
                       >
                         {selectedIds.size === filtered.length && filtered.length > 0 && <Check className="w-3 h-3" />}
                       </button>
                     </th>
                   )}
-                  <th className="px-5 py-3.5 text-[11px] font-semibold text-gray-500 uppercase tracking-wider border-y border-gray-100">Name</th>
-                  <th className="px-5 py-3.5 text-[11px] font-semibold text-gray-500 uppercase tracking-wider border-y border-gray-100">Slug</th>
-                  <th className="px-5 py-3.5 text-[11px] font-semibold text-gray-500 uppercase tracking-wider border-y border-gray-100">Products</th>
-                  <th className="px-5 py-3.5 text-[11px] font-semibold text-gray-500 uppercase tracking-wider border-y border-gray-100">Brands</th>
-                  <th className="px-5 py-3.5 border-y border-gray-100"></th>
+                  <th className="px-5 py-3.5 text-[11px] font-semibold text-gray-500 uppercase tracking-wider bg-gray-50 sticky top-0 z-20 border-b border-gray-100 shadow-sm">Name</th>
+
+                  <th className="px-5 py-3.5 text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-center w-24 bg-gray-50 sticky top-0 z-20 border-b border-gray-100 shadow-sm">Products</th>
+                  <th className="px-5 py-3.5 text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-center w-24 bg-gray-50 sticky top-0 z-20 border-b border-gray-100 shadow-sm">Brands</th>
+                  <th className="px-5 py-3.5 w-24 bg-gray-50 sticky top-0 z-20 border-b border-gray-100 shadow-sm"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -385,16 +411,17 @@ export default function AdminCategories() {
                     <motion.tr 
                       key={cat.id}
                       layout
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      transition={{ duration: 0.2 }}
                       className="hover:bg-gray-50/50 transition-colors group"
                     >
                       {selectionMode && (
                         <td className="px-5 py-3.5">
                           <button 
                             onClick={() => toggleSelect(cat.id)}
-                            className={`w-4 h-4 rounded flex items-center justify-center transition-colors border ${selectedIds.has(cat.id) ? 'bg-primary border-primary text-white' : 'border-gray-300 hover:border-primary'}`}
+                            className={`w-4 h-4 rounded flex items-center justify-center transition-colors border ${selectedIds.has(cat.id) ? 'bg-gray-900 border-gray-900 text-white' : 'border-gray-300 hover:border-gray-900'}`}
                           >
                             {selectedIds.has(cat.id) && <Check className="w-3 h-3" />}
                           </button>
@@ -402,22 +429,33 @@ export default function AdminCategories() {
                       )}
                     <td className="px-5 py-3.5">
                       <div className="flex items-center gap-2" style={{ paddingLeft: cat.level ? `${cat.level * 1.5}rem` : '0' }}>
-                        {cat.level > 0 && <span className="w-3 h-[1px] bg-gray-300 inline-block"></span>}
-                        <p className="text-[13px] font-semibold text-gray-900">{cat.name}</p>
+                        {cat.level > 0 && <span className="w-3 h-[1px] bg-gray-300 inline-block shrink-0"></span>}
+                        {cat.hasChildren && (
+                          <button 
+                            onClick={() => toggleCollapse(cat.id)} 
+                            className="p-0.5 rounded-md hover:bg-gray-200 text-gray-500 hover:text-gray-900 transition-colors shrink-0"
+                          >
+                            {collapsedCategories.has(cat.id) ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                          </button>
+                        )}
+                        {!cat.hasChildren && cat.level === 0 && <div className="w-[22px] shrink-0"></div>}
+                        <p className={`truncate ${cat.level > 0 ? 'font-medium text-gray-500 text-[12.5px]' : 'font-semibold text-gray-900 text-[13px]'}`}>
+                          {cat.name}
+                        </p>
+                      </div>
+                    </td>
+
+                    <td className="px-5 py-3.5">
+                      <div className="w-7 h-7 flex items-center justify-center rounded-full bg-gray-50 text-[12px] font-semibold text-gray-600 mx-auto">
+                        {cat.products_count || 0}
                       </div>
                     </td>
                     <td className="px-5 py-3.5">
-                      <p className="text-[13px] text-gray-500 font-mono bg-gray-100 inline-block px-2 py-0.5 rounded">{cat.slug}</p>
-                    </td>
-                    <td className="px-5 py-3.5">
-                      <span className="text-[13px] font-medium text-gray-900 bg-gray-100 px-2 py-1 rounded-md">
-                        {cat.products_count || 0}
-                      </span>
-                    </td>
-                    <td className="px-5 py-3.5">
-                      <span className="text-[13px] font-medium text-gray-900 bg-primary/10 text-primary px-2 py-1 rounded-md">
-                        {cat.brands?.length || 0}
-                      </span>
+                      {!categories.some((c: any) => c.parent_id === cat.id) && (
+                        <div className="w-7 h-7 flex items-center justify-center rounded-full bg-gray-50 text-[12px] font-semibold text-gray-600 mx-auto">
+                          {cat.brands?.length || 0}
+                        </div>
+                      )}
                     </td>
                     <td className="px-5 py-3.5 text-right">
                       <div className="flex items-center justify-end gap-2">

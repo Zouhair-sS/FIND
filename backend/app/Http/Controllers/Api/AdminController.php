@@ -27,8 +27,11 @@ class AdminController extends Controller
         $totalRevenue = Payment::whereIn('status', $approvedStatuses)->sum('amount');
         $revenueCurrency = Payment::whereIn('status', $approvedStatuses)->value('currency') ?? 'MAD';
 
-        // Orders to fulfill (processing)
-        $ordersToFulfill = Order::where('status', 'processing')->count();
+        // Orders to fulfill logic: anything not delivered and not canceled
+        $ordersToFulfill = Order::whereNotIn('status', ['delivered', 'canceled'])->count();
+        $ordersProcessing = Order::where('status', 'processing')->count();
+        $ordersShipped = Order::where('status', 'shipped')->count();
+        $ordersDelivered = Order::where('status', 'delivered')->count();
 
         // This month vs last month trends (real data)
         $ordersThisMonth = Order::where('created_at', '>=', $startOfMonth)->count();
@@ -125,6 +128,9 @@ class AdminController extends Controller
             'revenue_currency' => $revenueCurrency,
             'total_customers' => $totalCustomers,
             'orders_to_fulfill' => $ordersToFulfill,
+            'orders_processing' => $ordersProcessing,
+            'orders_shipped' => $ordersShipped,
+            'orders_delivered' => $ordersDelivered,
             'orders_trend' => $ordersTrend,
             'revenue_trend' => $revenueTrend,
             'orders_this_month' => $ordersThisMonth,
@@ -365,7 +371,7 @@ class AdminController extends Controller
     // --- BRANDS ---
     public function getBrands()
     {
-        $brands = \App\Models\Brand::all();
+        $brands = \App\Models\Brand::with('categories')->get();
         return response()->json($brands);
     }
 
@@ -374,7 +380,7 @@ class AdminController extends Controller
         $validated = $request->validate([
             'name' => 'required|string',
             'slug' => 'required|string|unique:brands',
-            'image' => 'nullable|image|max:2048'
+            'image' => 'nullable|mimes:jpeg,png,jpg,gif,svg,webp|max:2048'
         ]);
 
         $data = $request->only('name', 'slug');
@@ -394,7 +400,7 @@ class AdminController extends Controller
         $validated = $request->validate([
             'name' => 'required|string',
             'slug' => 'required|string|unique:brands,slug,' . $id,
-            'image' => 'nullable|image|max:2048'
+            'image' => 'nullable|mimes:jpeg,png,jpg,gif,svg,webp|max:2048'
         ]);
 
         $data = $request->only('name', 'slug');
@@ -425,6 +431,19 @@ class AdminController extends Controller
 
         $brand->delete();
         return response()->json(['message' => 'Deleted']);
+    }
+
+    public function toggleBrandCategory(Request $request, $brandId, $categoryId)
+    {
+        $brand = \App\Models\Brand::findOrFail($brandId);
+        $category = \App\Models\Category::findOrFail($categoryId);
+
+        $brand->categories()->toggle($categoryId);
+
+        return response()->json([
+            'message' => 'Toggled successfully',
+            'brand' => $brand->load('categories')
+        ]);
     }
 
     public function deleteOrder($id)

@@ -1,8 +1,21 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { fetchAdminBrands, createAdminBrand, updateAdminBrand, deleteAdminBrand, getImageUrl } from "@/lib/api";
-import { Layers, Plus, Search, Edit, Trash2, CheckSquare, X, Check, Image as ImageIcon } from "lucide-react";
+import { fetchAdminBrands, createAdminBrand, updateAdminBrand, deleteAdminBrand, getImageUrl, fetchAdminCategories, toggleAdminBrandCategory } from "@/lib/api";
+import { Layers, Plus, Search, Edit, Trash2, CheckSquare, X, Check, Image as ImageIcon, Laptop, Smartphone, Monitor, Headphones, Mouse, Keyboard, Watch, Folder } from "lucide-react";
+
+const getCategoryIcon = (slug: string) => {
+  switch (slug.toLowerCase()) {
+    case 'laptops': return <Laptop className="w-4 h-4" />;
+    case 'smartphones': return <Smartphone className="w-4 h-4" />;
+    case 'monitors': return <Monitor className="w-4 h-4" />;
+    case 'headphones-earbuds': return <Headphones className="w-4 h-4" />;
+    case 'mice': return <Mouse className="w-4 h-4" />;
+    case 'keyboards': return <Keyboard className="w-4 h-4" />;
+    case 'smartwatches': return <Watch className="w-4 h-4" />;
+    default: return <Folder className="w-4 h-4" />;
+  }
+};
 import ConfirmModal from "@/components/admin/ConfirmModal";
 import { AnimatePresence, motion } from "framer-motion";
 
@@ -154,6 +167,7 @@ function BrandModal({
 
 export default function AdminBrands() {
   const [brands, setBrands] = useState<any[]>([]);
+  const [leafCategories, setLeafCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
 
@@ -167,11 +181,20 @@ export default function AdminBrands() {
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
+  const [editingNameId, setEditingNameId] = useState<number | null>(null);
+  const [editingNameValue, setEditingNameValue] = useState("");
+  const tableLogoInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingLogoId, setUploadingLogoId] = useState<number | null>(null);
+
   const loadBrands = () => {
     setLoading(true);
-    fetchAdminBrands()
-      .then((data) => {
-        setBrands(data || []);
+    Promise.all([fetchAdminBrands(), fetchAdminCategories()])
+      .then(([brandsData, catsData]) => {
+        setBrands(brandsData || []);
+        if (catsData) {
+          const leaves = catsData.filter((c: any) => !catsData.some((child: any) => child.parent_id === c.id));
+          setLeafCategories(leaves);
+        }
       })
       .catch((err) => {
         console.error(err);
@@ -184,6 +207,78 @@ export default function AdminBrands() {
   useEffect(() => {
     loadBrands();
   }, []);
+
+  const handleToggleCategory = async (brandId: number, categoryId: number) => {
+    setBrands(prev => prev.map(b => {
+      if (b.id === brandId) {
+         const hasCat = b.categories?.some((c:any) => c.id === categoryId);
+         let newCats = b.categories || [];
+         if (hasCat) {
+            newCats = newCats.filter((c:any) => c.id !== categoryId);
+         } else {
+            newCats = [...newCats, { id: categoryId }];
+         }
+         return { ...b, categories: newCats };
+      }
+      return b;
+    }));
+
+    try {
+       await toggleAdminBrandCategory(brandId, categoryId);
+    } catch(err) {
+       console.error(err);
+       loadBrands(); // revert on error
+    }
+  };
+
+  const handleUpdateName = async (brand: any) => {
+    if (editingNameValue.trim() === "" || editingNameValue === brand.name) {
+      setEditingNameId(null);
+      return;
+    }
+    const newName = editingNameValue.trim();
+    const newSlug = newName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+    
+    // Optimistic update
+    setBrands(prev => prev.map(b => b.id === brand.id ? { ...b, name: newName, slug: newSlug } : b));
+    setEditingNameId(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("name", newName);
+      formData.append("slug", newSlug);
+      const updatedBrand = await updateAdminBrand(brand.id, formData);
+      setBrands(prev => prev.map(b => b.id === brand.id ? { ...b, ...updatedBrand } : b));
+    } catch (err) {
+      console.error(err);
+      loadBrands();
+    }
+  };
+
+  const handleLogoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0] && uploadingLogoId) {
+      const file = e.target.files[0];
+      const brand = brands.find(b => b.id === uploadingLogoId);
+      if (!brand) return;
+
+      const previewUrl = URL.createObjectURL(file);
+      setBrands(prev => prev.map(b => b.id === uploadingLogoId ? { ...b, image_url: previewUrl } : b));
+
+      try {
+        const formData = new FormData();
+        formData.append("name", brand.name);
+        formData.append("slug", brand.slug);
+        formData.append("image", file);
+        const updatedBrand = await updateAdminBrand(uploadingLogoId, formData);
+        setBrands(prev => prev.map(b => b.id === uploadingLogoId ? { ...b, image_url: updatedBrand.image_url } : b));
+      } catch (err) {
+        console.error(err);
+        loadBrands();
+      }
+    }
+    if (tableLogoInputRef.current) tableLogoInputRef.current.value = '';
+    setUploadingLogoId(null);
+  };
 
   const handleSave = async (data: FormData) => {
     if (editingBrand) {
@@ -306,19 +401,28 @@ export default function AdminBrands() {
 
       <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden flex flex-col">
         <div className="p-4 border-b border-gray-100 flex flex-col sm:flex-row gap-4 items-center justify-between bg-gray-50/50">
-          <div className="relative w-full sm:w-[320px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <div className="flex-1">
+            <div className="px-1">
+              <h2 className="text-[16px] font-bold text-gray-900 tracking-wide uppercase">
+                {brands.length} ACTIVE BRANDS
+              </h2>
+            </div>
+          </div>
+          <div className="w-full sm:w-[320px]">
+            <div className="relative w-full group">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-primary transition-colors" />
             <input
               type="text"
               placeholder="Search brands..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 text-[13px] border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all bg-white"
+              className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-full text-[13px] focus:outline-none focus:border-primary/30 focus:shadow-[0_4px_15px_rgba(0,35,102,0.05)] transition-all duration-300 placeholder:text-gray-400"
             />
           </div>
         </div>
+        </div>
 
-        <div className="overflow-x-auto">
+        <div className="overflow-auto max-h-[calc(100vh-250px)] relative">
           {loading ? (
             <div className="p-8 flex items-center justify-center h-40">
               <div className="w-5 h-5 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
@@ -332,30 +436,36 @@ export default function AdminBrands() {
               <p className="text-[13px] text-gray-500 mt-1">Try adjusting your search or create a new one.</p>
             </div>
           ) : (
-            <table className="w-full text-left border-collapse">
+            <table className="w-full text-left border-separate border-spacing-0">
               <thead>
-                <tr className="bg-gray-50/50">
+                <tr className="text-[11px] text-gray-400 uppercase tracking-wider">
                   {selectionMode && (
-                    <th className="px-5 py-3.5 w-[50px] border-y border-gray-100">
+                    <th className="px-5 py-3.5 w-[50px] bg-gray-50 sticky top-0 z-20 border-b border-gray-100 shadow-sm">
                       <button 
                         onClick={toggleSelectAll}
-                        className={`w-4 h-4 rounded flex items-center justify-center transition-colors border ${selectedIds.size === filtered.length && filtered.length > 0 ? 'bg-primary border-primary text-white' : 'border-gray-300 hover:border-primary'}`}
+                        className={`w-4 h-4 rounded flex items-center justify-center transition-colors border ${selectedIds.size === filtered.length && filtered.length > 0 ? 'bg-gray-900 border-gray-900 text-white' : 'border-gray-300 hover:border-gray-900'}`}
                       >
                         {selectedIds.size === filtered.length && filtered.length > 0 && <Check className="w-3 h-3" />}
                       </button>
                     </th>
                   )}
-                  <th className="px-5 py-3.5 text-[11px] font-semibold text-gray-500 uppercase tracking-wider border-y border-gray-100 w-16">Logo</th>
-                  <th className="px-5 py-3.5 text-[11px] font-semibold text-gray-500 uppercase tracking-wider border-y border-gray-100">Name</th>
-                  <th className="px-5 py-3.5 text-[11px] font-semibold text-gray-500 uppercase tracking-wider border-y border-gray-100">Slug</th>
-                  <th className="px-5 py-3.5 border-y border-gray-100"></th>
+                  <th className="px-5 py-3.5 text-[11px] font-semibold text-gray-500 uppercase tracking-wider bg-gray-50 sticky top-0 z-20 border-b border-gray-100 shadow-sm w-24">Logo</th>
+                  <th className="px-5 py-3.5 text-[11px] font-semibold text-gray-500 uppercase tracking-wider bg-gray-50 sticky top-0 z-20 border-b border-gray-100 shadow-sm w-[240px]">Name</th>
+                  {leafCategories.map(cat => (
+                    <th key={cat.id} className="px-3 py-3.5 text-center bg-gray-50 sticky top-0 z-20 border-b border-gray-100 shadow-sm" title={cat.name}>
+                      <div className="flex justify-center text-gray-400 hover:text-gray-700 transition-colors">
+                        {getCategoryIcon(cat.slug)}
+                      </div>
+                    </th>
+                  ))}
+                  <th className="px-5 py-3.5 bg-gray-50 sticky top-0 z-20 border-b border-gray-100 shadow-sm"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 <AnimatePresence initial={false}>
-                  {filtered.map((cat) => (
+                  {filtered.map((brand) => (
                     <motion.tr 
-                      key={cat.id}
+                      key={brand.id}
                       layout
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
@@ -365,44 +475,82 @@ export default function AdminBrands() {
                       {selectionMode && (
                         <td className="px-5 py-3.5">
                           <button 
-                            onClick={() => toggleSelect(cat.id)}
-                            className={`w-4 h-4 rounded flex items-center justify-center transition-colors border ${selectedIds.has(cat.id) ? 'bg-primary border-primary text-white' : 'border-gray-300 hover:border-primary'}`}
+                            onClick={() => toggleSelect(brand.id)}
+                            className={`w-4 h-4 rounded flex items-center justify-center transition-colors border ${selectedIds.has(brand.id) ? 'bg-gray-900 border-gray-900 text-white' : 'border-gray-300 hover:border-gray-900'}`}
                           >
-                            {selectedIds.has(cat.id) && <Check className="w-3 h-3" />}
+                            {selectedIds.has(brand.id) && <Check className="w-3 h-3" />}
                           </button>
                         </td>
                       )}
                     <td className="px-5 py-3.5">
-                      <div className="w-10 h-10 rounded-lg border border-gray-100 bg-white flex items-center justify-center overflow-hidden">
-                        {cat.image_url ? (
-                          <img src={getImageUrl(cat.image_url)} alt={cat.name} className="w-full h-full object-contain p-1" />
+                      <div 
+                        onClick={() => {
+                          setUploadingLogoId(brand.id);
+                          tableLogoInputRef.current?.click();
+                        }}
+                        className="w-10 h-10 rounded-lg border border-gray-200 bg-white flex items-center justify-center overflow-hidden cursor-pointer relative group/logo"
+                        title="Click to change logo"
+                      >
+                        {brand.image_url ? (
+                          <img src={brand.image_url.startsWith('blob:') ? brand.image_url : getImageUrl(brand.image_url)} alt={brand.name} className="w-full h-full object-contain p-1 transition-opacity group-hover/logo:opacity-50" />
                         ) : (
-                          <span className="text-[12px] font-bold text-gray-400">{cat.name.substring(0, 1).toUpperCase()}</span>
+                          <span className="text-[12px] font-bold text-gray-400 transition-opacity group-hover/logo:opacity-50">{brand.name.substring(0, 1).toUpperCase()}</span>
                         )}
+                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/logo:opacity-100 transition-opacity bg-black/5">
+                          <Edit className="w-3.5 h-3.5 text-gray-700" />
+                        </div>
                       </div>
                     </td>
                     <td className="px-5 py-3.5">
-                      <p className="text-[13px] font-semibold text-gray-900">{cat.name}</p>
+                      {editingNameId === brand.id ? (
+                        <input
+                          type="text"
+                          value={editingNameValue}
+                          onChange={(e) => setEditingNameValue(e.target.value)}
+                          onBlur={() => handleUpdateName(brand)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleUpdateName(brand);
+                            if (e.key === 'Escape') setEditingNameId(null);
+                          }}
+                          autoFocus
+                          size={Math.max(editingNameValue.length, 10)}
+                          className="max-w-[200px] px-2 py-1 text-[13px] font-semibold text-gray-700 bg-gray-50/50 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-gray-200/50 focus:border-gray-300 transition-all"
+                        />
+                      ) : (
+                        <p 
+                          onClick={() => {
+                            setEditingNameId(brand.id);
+                            setEditingNameValue(brand.name);
+                          }}
+                          className="text-[13px] font-semibold text-gray-900 cursor-text hover:bg-gray-100 px-2 py-1 -ml-2 rounded inline-block transition-colors"
+                          title="Click to rename"
+                        >
+                          {brand.name}
+                        </p>
+                      )}
                     </td>
-                    <td className="px-5 py-3.5">
-                      <p className="text-[13px] text-gray-500 font-mono bg-gray-100 inline-block px-2 py-0.5 rounded">{cat.slug}</p>
-                    </td>
+                    
+                    {leafCategories.map(lc => {
+                      const isChecked = brand.categories?.some((c: any) => c.id === lc.id);
+                      return (
+                        <td key={lc.id} className="px-3 py-3.5 text-center">
+                          <input 
+                            type="checkbox"
+                            checked={!!isChecked}
+                            onChange={() => handleToggleCategory(brand.id, lc.id)}
+                            className="w-4 h-4 rounded border-gray-300 text-gray-900 focus:ring-gray-900 !accent-gray-900 cursor-pointer"
+                            title={`Assign to ${lc.name}`}
+                          />
+                        </td>
+                      );
+                    })}
+
                     <td className="px-5 py-3.5 text-right">
                       <div className="flex items-center justify-end gap-2">
                         <button 
                           onClick={() => {
-                            setEditingBrand(cat);
-                            setModalOpen(true);
-                          }}
-                          className="p-1.5 text-gray-400 hover:text-primary hover:bg-primary/5 rounded transition-colors" 
-                          title="Edit"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button 
-                          onClick={() => {
                             setIsBulkDelete(false);
-                            setDeletingId(cat.id);
+                            setDeletingId(brand.id);
                             setConfirmOpen(true);
                           }}
                           className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors" 
@@ -420,6 +568,14 @@ export default function AdminBrands() {
           )}
         </div>
       </div>
+
+      <input 
+        type="file"
+        ref={tableLogoInputRef}
+        className="hidden"
+        accept="image/*"
+        onChange={handleLogoChange}
+      />
 
       <AnimatePresence>
         {modalOpen && (

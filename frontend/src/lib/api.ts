@@ -247,6 +247,10 @@ export const deleteAdminBrand = async (id: number) => {
   return adminAxios.delete(`/api/admin/brands/${id}`).then((res) => res.data);
 };
 
+export const toggleAdminBrandCategory = async (brandId: number, categoryId: number) => {
+  return adminAxios.post(`/api/admin/brands/${brandId}/categories/${categoryId}/toggle`).then((res) => res.data);
+};
+
 export async function fetchAdminPayments(page: number = 1): Promise<PaginatedResponse<any>> {
   const res = await adminAxios.get(`/api/admin/payments?page=${page}`);
   return res.data;
@@ -294,6 +298,12 @@ export async function createAdminProduct(data: any): Promise<any> {
 }
 
 export async function updateAdminProduct(id: string | number, data: any): Promise<any> {
+  if (data instanceof FormData) {
+    const res = await adminAxios.post(`/api/admin/products/${id}`, data, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    return res.data;
+  }
   const res = await adminAxios.put(`/api/admin/products/${id}`, data);
   return res.data;
 }

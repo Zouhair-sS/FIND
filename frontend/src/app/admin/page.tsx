@@ -15,6 +15,7 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   ArrowRight,
+  CheckCircle2,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { motion, Variants, AnimatePresence } from "framer-motion";
@@ -30,6 +31,9 @@ interface DashboardData {
   total_revenue: number;
   revenue_currency: string;
   orders_to_fulfill: number;
+  orders_processing?: number;
+  orders_shipped?: number;
+  orders_delivered?: number;
   orders_trend: number | null;
   revenue_trend: number | null;
 }
@@ -38,7 +42,7 @@ const STATUS_CONFIG: Record<string, { bg: string; text: string; dot: string; bor
   pending:           { bg: "bg-amber-50",   text: "text-amber-700",   dot: "bg-amber-400",   border: "border-amber-100" },
   pending_payment:   { bg: "bg-amber-50",   text: "text-amber-700",   dot: "bg-amber-400",   border: "border-amber-100" },
   processing:        { bg: "bg-blue-50",    text: "text-blue-700",    dot: "bg-blue-400",    border: "border-blue-100" },
-  shipped:           { bg: "bg-emerald-50",  text: "text-emerald-700",  dot: "bg-emerald-400",  border: "border-emerald-100" },
+  shipped:           { bg: "bg-purple-50",  text: "text-purple-700",  dot: "bg-purple-400",  border: "border-purple-100" },
   delivered:         { bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-500", border: "border-emerald-100" },
   canceled:          { bg: "bg-red-50",     text: "text-red-700",     dot: "bg-red-500",     border: "border-red-100" },
 };
@@ -187,6 +191,11 @@ export default function AdminDashboard() {
             icon: Clock,
             trend: null,
             href: "/admin/orders?highlight=to-fulfil",
+            subStats: [
+              { label: "Processing", count: data.orders_processing || 0, color: "bg-blue-50 text-blue-700 border-blue-100" },
+              { label: "Shipped", count: data.orders_shipped || 0, color: "bg-purple-50 text-purple-700 border-purple-100" },
+              { label: "Delivered", count: data.orders_delivered || 0, color: "bg-emerald-50 text-emerald-700 border-emerald-100", icon: CheckCircle2 },
+            ]
           },
         ].map((stat, i) => (
           <motion.div
@@ -212,6 +221,17 @@ export default function AdminDashboard() {
             <div className="relative z-10">
               <p className="text-[13px] font-medium text-gray-500">{stat.title}</p>
               <h3 className="text-[24px] font-bold text-gray-900 mt-1 group-hover:text-primary transition-colors duration-300">{stat.value}</h3>
+              {stat.subStats && (
+                <div className="flex flex-wrap items-center gap-1.5 mt-3">
+                  {stat.subStats.map((sub, idx) => (
+                    <div key={idx} className={`flex items-center gap-1 px-2 py-0.5 rounded-full border ${sub.color}`}>
+                      <span className="text-[11px] font-bold">{sub.count}</span>
+                      <span className="text-[10px] font-medium">{sub.label}</span>
+                      {sub.icon && <sub.icon className="w-3 h-3 ml-0.5" />}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
             
             {stat.href && (

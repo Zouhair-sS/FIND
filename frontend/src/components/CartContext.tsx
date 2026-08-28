@@ -1,7 +1,8 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo } from "react";
+import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo, useRef, useCallback } from "react";
 import { fetchProductBySlug } from "@/lib/api";
+import { useAuth } from "@/components/AuthContext";
 
 // A UUID generator for the cart
 function generateUUID() {
@@ -52,44 +53,77 @@ interface CartContextType {
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
+const EMPTY_CART: CartState = { cartId: "", items: [] };
+
+/** Returns the localStorage key for the cart based on the current user */
+function getCartStorageKey(userId: number | null): string {
+  return userId ? `find_cart_v3_user_${userId}` : "find_cart_v3_guest";
+}
+
+/** Load cart state from localStorage for a given user */
+function loadCartFromStorage(userId: number | null): CartState {
+  try {
+    const key = getCartStorageKey(userId);
+    const saved = localStorage.getItem(key);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (!parsed.cartId) parsed.cartId = generateUUID();
+      return parsed;
+    }
+  } catch {
+    // Corrupted data, start fresh
+  }
+  return { cartId: generateUUID(), items: [] };
+}
+
+/** Save cart state to localStorage for a given user */
+function saveCartToStorage(userId: number | null, state: CartState) {
+  try {
+    const key = getCartStorageKey(userId);
+    localStorage.setItem(key, JSON.stringify(state));
+  } catch {
+    console.error("Failed to save cart to localStorage");
+  }
+}
+
 export function CartProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<CartState>({ cartId: "", items: [] });
+  const { user, loading: authLoading } = useAuth();
+  const [state, setState] = useState<CartState>(EMPTY_CART);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [livePrices, setLivePrices] = useState<Record<number, { price: number; stock: number }>>({});
   const [isLoadingPrices, setIsLoadingPrices] = useState(false);
+  
+  // Track the current user ID to detect changes and persist to the right key
+  const currentUserIdRef = useRef<number | null | undefined>(undefined);
 
-  // 1. Load from local storage
+  // 1. Load cart when auth state resolves or user changes
   useEffect(() => {
+    // Don't load until we're client-side and auth has resolved
+    if (authLoading) return;
+
+    const userId = user?.id ?? null;
+
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsMounted(true);
+
+    // If the user identity hasn't changed, don't reload
+    if (currentUserIdRef.current === userId) return;
     
-    const loadCart = () => {
-      const saved = localStorage.getItem("find_cart_v3");
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          if (!parsed.cartId) parsed.cartId = generateUUID();
-          setState(parsed);
-        } catch {
-          setState({ cartId: generateUUID(), items: [] });
-        }
-      } else {
-        setState({ cartId: generateUUID(), items: [] });
-      }
-    };
+    currentUserIdRef.current = userId;
+    const loaded = loadCartFromStorage(userId);
+    setState(loaded);
+    // Reset live prices when switching users
+    setLivePrices({});
+  }, [user, authLoading]);
 
-    loadCart();
-
-    window.addEventListener("reload-cart", loadCart);
-    return () => window.removeEventListener("reload-cart", loadCart);
-  }, []);
-
-  // 2. Save to local storage
+  // 2. Save to localStorage whenever cart state changes
   useEffect(() => {
-    if (isMounted && state.cartId) {
-      localStorage.setItem("find_cart_v3", JSON.stringify(state));
-    }
+    if (!isMounted || !state.cartId) return;
+    // currentUserIdRef always holds the resolved user
+    const userId = currentUserIdRef.current;
+    if (userId === undefined) return; // auth hasn't resolved yet
+    saveCartToStorage(userId, state);
   }, [state, isMounted]);
 
   // 3. Fetch live prices for variants in cart
@@ -135,7 +169,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.items, isMounted]); // livePrices deliberately omitted to avoid infinite loops
 
-  const addItem = (newItem: Omit<CartItem, "quantity"> & { quantity?: number }) => {
+  const addItem = useCallback((newItem: Omit<CartItem, "quantity"> & { quantity?: number }) => {
     const qty = newItem.quantity || 1;
     setState((prev) => {
       const existing = prev.items.find((i) => i.variantId === newItem.variantId);
@@ -161,16 +195,16 @@ export function CartProvider({ children }: { children: ReactNode }) {
       };
     });
     setIsCartOpen(true);
-  };
+  }, [livePrices]);
 
-  const removeItem = (variantId: number) => {
+  const removeItem = useCallback((variantId: number) => {
     setState((prev) => ({
       ...prev,
       items: prev.items.filter((i) => i.variantId !== variantId),
     }));
-  };
+  }, []);
 
-  const updateQuantity = (variantId: number, quantity: number) => {
+  const updateQuantity = useCallback((variantId: number, quantity: number) => {
     if (quantity <= 0) {
       removeItem(variantId);
       return;
@@ -183,9 +217,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
       ...prev,
       items: prev.items.map((i) => (i.variantId === variantId ? { ...i, quantity: finalQuantity } : i)),
     }));
-  };
+  }, [livePrices, removeItem]);
 
-  const clearCart = () => setState(prev => ({ ...prev, items: [] }));
+  const clearCart = useCallback(() => setState(prev => ({ ...prev, items: [] })), []);
 
   // Derived state
   const enrichedItems: EnrichedCartItem[] = useMemo(() => {

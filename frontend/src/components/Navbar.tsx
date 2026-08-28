@@ -343,15 +343,8 @@ export default function Navbar() {
                           const firstVariant = product.variants?.[0];
                           const price = firstVariant ? parseFloat(firstVariant.price) : 0;
                           
-                          // Build a custom name string including variant specifics if any, like the screenshot
-                          const specs = [
-                            firstVariant?.processor ? (firstVariant.processor.includes('Puce') ? firstVariant.processor : `Puce ${firstVariant.processor}`) : null,
-                            firstVariant?.ram_gb ? `${firstVariant.ram_gb}GB` : null,
-                            firstVariant?.storage_gb ? (firstVariant.storage_gb >= 1024 ? `${firstVariant.storage_gb/1024}TB` : `${firstVariant.storage_gb}GB`) : null
-                          ].filter(Boolean).join(' ');
-
-                          const variantSpecs = specs ? ` - ${specs}` : '';
-                          const displayName = `${product.name}${variantSpecs}`;
+                          // Just use the actual product name
+                          const displayName = product.name;
 
                           return (
                             <button

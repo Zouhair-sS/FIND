@@ -1,64 +1,35 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import {
-  fetchAdminProduct,
-  fetchAdminMetadata,
-  updateAdminProduct,
-  addAdminConfiguration,
-  deleteAdminConfiguration,
-  createAdminVariant,
-  updateAdminVariant,
-  deleteAdminVariant,
-  uploadAdminProductImage,
-  deleteAdminProductImage,
-  getImageUrl
-} from "@/lib/api";
-import Link from "next/link";
-import Image from "next/image";
+import { fetchAdminMetadata, fetchAdminProduct, updateAdminProduct, getImageUrl } from "@/lib/api";
 import ColorPickerField from "@/components/admin/ColorPickerField";
 import BrandSelector from "@/components/admin/BrandSelector";
 import CategorySelector from "@/components/admin/CategorySelector";
 import CustomSelect from "@/components/admin/CustomSelect";
 import ConfirmModal from "@/components/admin/ConfirmModal";
 import { useToast } from "@/components/admin/Toast";
-import {
-  ArrowLeft,
-  Save,
-  Plus,
-  Trash2,
-  Image as ImageIcon,
-  MoreVertical,
-  Settings,
-  Eye,
-  ChevronDown,
-  ChevronUp,
-  Edit,
-  Copy,
-  Loader2
-} from "lucide-react";
-import { formatPrice } from "@/lib/formatPrice";
+import Link from "next/link";
+import { ArrowLeft, Save, Package, Loader2, Upload, X, Plus, Image as ImageIcon } from "lucide-react";
+import Image from "next/image";
 
-export default function AdminProductEditor() {
-  const params = useParams();
+export default function EditProductWizard() {
   const router = useRouter();
+  const params = useParams();
   const id = params.id as string;
-
-  const [group, setGroup] = useState<any>(null);
+  
   const [metadata, setMetadata] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<"overview" | "configurations" | "images">("overview");
-  const [expandedConfigs, setExpandedConfigs] = useState<Record<number, boolean>>({});
+  const [images, setImages] = useState<File[]>([]);
+  const [existingImages, setExistingImages] = useState<any[]>([]);
+  const [deletedImages, setDeletedImages] = useState<number[]>([]);
+  const [deletedVariants, setDeletedVariants] = useState<number[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [subcategoryVisible, setSubcategoryVisible] = useState(false);
+  const { success, error: showError } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Modals state
-  const [addConfigModal, setAddConfigModal] = useState(false);
-  const [addVariantModal, setAddVariantModal] = useState<number | null>(null);
-  const [editVariantModal, setEditVariantModal] = useState<any>(null);
-  const [newConfigData, setNewConfigData] = useState({ price: '' });
-  const [newVariantData, setNewVariantData] = useState({ price: '', stock: '0', color: '', storage_gb: '', ram_gb: '', processor: '', product_image_id: '' });
-  const [editVariantData, setEditVariantData] = useState({ price: '', stock: '0', color: '', storage_gb: '', ram_gb: '', processor: '', product_image_id: '' });
   const [modalConfig, setModalConfig] = useState<{
     isOpen: boolean;
     title: string;
@@ -68,908 +39,712 @@ export default function AdminProductEditor() {
     onConfirm?: () => void;
   }>({ isOpen: false, title: "", message: "" });
 
-  // Basic Info Form State
-  const [initialData, setInitialData] = useState<any>(null);
   const [formData, setFormData] = useState({
     name: "",
     brand_id: "",
     category_id: "",
     series_id: "",
-    status: "draft",
     description: "",
+    status: "active",
+    variants: [{
+      id: null as number | null,
+      price: "",
+      stock_quantity: "0",
+      sku: "",
+      color: "",
+      storage_gb: "",
+      ram_gb: "",
+      processor: "",
+      screen_size: "",
+      image_index: null as number | null,
+      existing_image_id: null as number | null,
+    }]
   });
 
-  const { success, error: showError } = useToast();
-
   useEffect(() => {
-    async function load() {
-      try {
-        const [prodRes, metaRes] = await Promise.all([
-          fetchAdminProduct(id),
-          fetchAdminMetadata(),
-        ]);
-        setGroup(prodRes);
-        setMetadata(metaRes);
-        const initial = {
-          name: prodRes.name || "",
-          brand_id: prodRes.brand_id?.toString() || "",
-          category_id: prodRes.category_id?.toString() || "",
-          series_id: prodRes.series_id?.toString() || "",
-          status: prodRes.status || "draft",
-          description: prodRes.description || "",
-        };
-        setFormData(initial);
-        setInitialData(initial);
-        
-        // Expand first config by default
-        if (prodRes.configurations?.length > 0) {
-          setExpandedConfigs({ [prodRes.configurations[0].id]: true });
-        }
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    load();
-  }, [id]);
+    Promise.all([
+      fetchAdminMetadata(),
+      fetchAdminProduct(id)
+    ]).then(([metaRes, prodRes]) => {
+      setMetadata(metaRes);
+      
+      const config = prodRes.configurations ? (prodRes.configurations.find((c: any) => c.id === Number(id)) || prodRes.configurations[0]) : prodRes;
 
-  // Auto-save basic info
-  useEffect(() => {
-    if (!initialData || !group?.group_id) return;
-    const isChanged = JSON.stringify(formData) !== JSON.stringify(initialData);
-    if (!isChanged) return;
-
-    const delay = setTimeout(async () => {
-      try {
-        await updateAdminProduct(group.group_id, formData);
-        setInitialData(formData);
-        success("Changes saved");
-      } catch (err) {
-        showError("Failed to save changes");
-      }
-    }, 2000);
-    return () => clearTimeout(delay);
-  }, [formData, initialData, group?.group_id, success, showError]);
-
-  const toggleConfig = (configId: number) => {
-    setExpandedConfigs(prev => ({ ...prev, [configId]: !prev[configId] }));
-  };
-
-  const getVariantLabel = (v: any) => {
-    const parts = [];
-    if (v.processor) parts.push(v.processor);
-    if (v.ram_gb) parts.push(`${v.ram_gb} GB RAM`);
-    if (v.storage_gb) parts.push(v.storage_gb >= 1024 ? `${v.storage_gb/1024} TB` : `${v.storage_gb} GB`);
-    if (v.screen_size) parts.push(`${v.screen_size}"`);
-    if (v.color) parts.push(v.color);
-    return parts.join(' · ') || 'Base Variant';
-  };
-
-  const getConfigLabel = (variants: any[]) => {
-    if (!variants || variants.length === 0) return "Empty Configuration";
-    const v = variants[0];
-    const parts = [];
-    if (v.processor) parts.push(v.processor);
-    if (v.ram_gb) parts.push(`${v.ram_gb} GB RAM`);
-    if (v.storage_gb) parts.push(v.storage_gb >= 1024 ? `${v.storage_gb/1024} TB` : `${v.storage_gb} GB`);
-    return parts.join(' · ') || 'Standard Configuration';
-  };
-
-  const handleDeleteVariant = (variantId: number) => {
-    setModalConfig({
-      isOpen: true,
-      title: "Delete Variant",
-      message: "Are you sure you want to delete this variant?",
-      variant: "danger",
-      onConfirm: async () => {
-        setModalConfig(prev => ({ ...prev, isOpen: false }));
-        try {
-          await deleteAdminVariant(variantId);
-          const prodRes = await fetchAdminProduct(id);
-          setGroup(prodRes);
-        } catch (err) {
-          console.error(err);
-        }
-      }
-    });
-  };
-
-  const handleDeleteConfiguration = (configId: number, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setModalConfig({
-      isOpen: true,
-      title: "Delete Configuration",
-      message: "Are you sure you want to delete this configuration and all its variants?",
-      variant: "danger",
-      onConfirm: async () => {
-        setModalConfig(prev => ({ ...prev, isOpen: false }));
-        try {
-          await deleteAdminConfiguration(configId);
-          const prodRes = await fetchAdminProduct(id);
-          setGroup(prodRes);
-        } catch (err) {
-          console.error(err);
-        }
-      }
-    });
-  };
-
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, configId: number) => {
-    if (!e.target.files || e.target.files.length === 0) return;
-    const file = e.target.files[0];
-    try {
-      await uploadAdminProductImage(configId, file);
-      const prodRes = await fetchAdminProduct(id);
-      setGroup(prodRes);
-      success("Image uploaded");
-    } catch (err) {
-      console.error(err);
-      showError("Failed to upload image");
-    }
-    e.target.value = ''; // reset input
-  };
-
-  const handleDeleteImage = (imageId: number) => {
-    setModalConfig({
-      isOpen: true,
-      title: "Delete Image",
-      message: "Are you sure you want to delete this image?",
-      variant: "danger",
-      onConfirm: async () => {
-        setModalConfig(prev => ({ ...prev, isOpen: false }));
-        try {
-          await deleteAdminProductImage(imageId);
-          const prodRes = await fetchAdminProduct(id);
-          setGroup(prodRes);
-          success("Image deleted");
-        } catch (err) {
-          console.error(err);
-          showError("Failed to delete image");
-        }
-      }
-    });
-  };
-
-  const handleCreateConfig = async () => {
-    if (!newConfigData.price) return;
-    try {
-      const generatedSku = `CFG-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-      await addAdminConfiguration(group.group_id, {
-        sku: generatedSku,
-        variants: [{ sku: generatedSku, price: Number(newConfigData.price), stock_quantity: 0 }]
-      });
-      const prodRes = await fetchAdminProduct(id);
-      setGroup(prodRes);
-      setAddConfigModal(false);
-      setNewConfigData({ price: '' });
-      success("Configuration added");
-    } catch (err) {
-      showError("Failed to create configuration");
-    }
-  };
-
-  const handleCreateVariant = async () => {
-    if (!addVariantModal || !newVariantData.price) return;
-    
-    // Check for duplicates
-    const config = group.configurations?.find((c: any) => c.id === addVariantModal);
-    if (config && config.variants) {
-      const isDuplicate = config.variants.some((v: any) => {
-        const sameColor = (v.color || '') === (newVariantData.color || '');
-        const sameStorage = String(v.storage_gb || '') === String(newVariantData.storage_gb || '');
-        const sameRam = String(v.ram_gb || '') === String(newVariantData.ram_gb || '');
-        const sameProcessor = (v.processor || '').toLowerCase() === (newVariantData.processor || '').toLowerCase();
-        
-        return sameColor && sameStorage && sameRam && sameProcessor;
+      setFormData({
+        name: prodRes.name || config.name || '',
+        brand_id: prodRes.brand_id?.toString() || config.brand_id?.toString() || '',
+        category_id: prodRes.category_id?.toString() || config.category_id?.toString() || '',
+        series_id: prodRes.series_id?.toString() || config.series_id?.toString() || '',
+        description: prodRes.description || config.description || '',
+        status: prodRes.status || config.status || 'active',
+        variants: config.variants?.length ? config.variants.map((v: any) => ({
+          id: v.id,
+          price: v.price?.toString() || '',
+          stock_quantity: v.stock_quantity?.toString() || '0',
+          sku: v.sku || '',
+          color: v.color || '',
+          storage_gb: v.storage_gb?.toString() || '',
+          ram_gb: v.ram_gb?.toString() || '',
+          processor: v.processor || '',
+          screen_size: v.screen_size?.toString() || '',
+          image_index: null,
+          existing_image_id: v.product_image_id || null,
+        })) : [{
+          id: null,
+          price: '',
+          stock_quantity: '0',
+          sku: '',
+          color: '',
+          storage_gb: '',
+          ram_gb: '',
+          processor: '',
+          screen_size: '',
+          image_index: null,
+          existing_image_id: null,
+        }]
       });
       
-      if (isDuplicate) {
-        setModalConfig({
-          isOpen: true,
-          title: "Duplicate Variant",
-          message: "A variant with these exact specifications already exists in this configuration.",
-          isAlert: true,
-          variant: "warning"
-        });
-        return;
+      if (config.images) {
+        setExistingImages(config.images);
       }
-    }
+      
+      setLoading(false);
+    });
+  }, [id]);
 
-    try {
-      const generatedSku = `VAR-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-      await createAdminVariant(addVariantModal, {
-        sku: generatedSku,
-        price: Number(newVariantData.price),
-        stock_quantity: Number(newVariantData.stock),
-        color: newVariantData.color,
-        storage_gb: newVariantData.storage_gb ? Number(newVariantData.storage_gb) : null,
-        ram_gb: newVariantData.ram_gb ? Number(newVariantData.ram_gb) : null,
-        processor: newVariantData.processor,
-        product_image_id: newVariantData.product_image_id ? Number(newVariantData.product_image_id) : null,
-      });
-      const prodRes = await fetchAdminProduct(id);
-      setGroup(prodRes);
-      setAddVariantModal(null);
-      setNewVariantData({ price: '', stock: '0', color: '', storage_gb: '', ram_gb: '', processor: '', product_image_id: '' });
-      success("Variant added");
-    } catch (err) {
-      showError("Failed to create variant");
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const newFiles = Array.from(e.target.files);
+      setImages(prev => [...prev, ...newFiles]);
+      
+      const newPreviews = newFiles.map(file => URL.createObjectURL(file));
+      setImagePreviews(prev => [...prev, ...newPreviews]);
     }
   };
 
-  const handleUpdateVariant = async () => {
-    if (!editVariantModal || !editVariantData.price) return;
+  const removeExistingImage = (id: number) => {
+    setDeletedImages(prev => [...prev, id]);
+    setExistingImages(prev => prev.filter(img => img.id !== id));
+  };
+  
+  const removeImage = (index: number) => {
+    setImages(prev => prev.filter((_, i) => i !== index));
+    setImagePreviews(prev => {
+      URL.revokeObjectURL(prev[index]);
+      return prev.filter((_, i) => i !== index);
+    });
+  };
 
+  const addVariant = () => {
+    setFormData(prev => ({
+      ...prev,
+      variants: [...prev.variants, {
+        id: null,
+        price: prev.variants[0].price,
+        stock_quantity: "0",
+        sku: "",
+        color: "",
+        storage_gb: "",
+        ram_gb: "",
+        processor: "",
+        screen_size: "",
+        image_index: null,
+        existing_image_id: null,
+      }]
+    }));
+  };
+
+  const removeVariant = (index: number) => {
+    const variantToRemove = formData.variants[index];
+    if (variantToRemove.id !== null) {
+      setDeletedVariants(prev => [...prev, variantToRemove.id as number]);
+    }
+    setFormData(prev => ({
+      ...prev,
+      variants: prev.variants.filter((_, i) => i !== index)
+    }));
+  };
+
+  const updateVariant = (index: number, field: string, value: any) => {
+    setFormData(prev => {
+      const newVariants = [...prev.variants];
+      newVariants[index] = { ...newVariants[index], [field]: value };
+      return { ...prev, variants: newVariants };
+    });
+  };
+
+  const handleUpdate = async (status: string) => {
+    setSaving(true);
     try {
-      await updateAdminVariant(editVariantModal.id, {
-        sku: editVariantModal.sku, // keep original sku
-        price: Number(editVariantData.price),
-        stock_quantity: Number(editVariantData.stock),
-        color: editVariantData.color,
-        storage_gb: editVariantData.storage_gb ? Number(editVariantData.storage_gb) : null,
-        ram_gb: editVariantData.ram_gb ? Number(editVariantData.ram_gb) : null,
-        processor: editVariantData.processor,
-        product_image_id: editVariantData.product_image_id ? Number(editVariantData.product_image_id) : null,
+      const category = metadata?.categories?.find((c: any) => c.id == formData.category_id)?.name || 'CAT';
+      const brand = metadata?.brands?.find((b: any) => b.id == formData.brand_id)?.name || 'BRND';
+      const catPrefix = category.substring(0, 3).toUpperCase();
+      const brandPrefix = brand.substring(0, 3).toUpperCase();
+      const randStr = Math.random().toString(36).substring(2, 6).toUpperCase();
+
+      const fd = new FormData();
+      fd.append('_method', 'PUT');
+      fd.append('name', formData.name);
+      fd.append('brand_id', formData.brand_id);
+      fd.append('category_id', formData.category_id);
+      if (formData.series_id) fd.append('series_id', formData.series_id);
+      fd.append('description', formData.description);
+      fd.append('status', status);
+
+      formData.variants.forEach((v, i) => {
+        if (v.id) fd.append(`variants[${i}][id]`, v.id.toString());
+        fd.append(`variants[${i}][price]`, v.price);
+        fd.append(`variants[${i}][stock_quantity]`, v.stock_quantity);
+        fd.append(`variants[${i}][sku]`, v.sku || `${brandPrefix}-${catPrefix}-${randStr}-V${i+1}`);
+        if (v.color) fd.append(`variants[${i}][color]`, v.color);
+        if (v.storage_gb) fd.append(`variants[${i}][storage_gb]`, v.storage_gb);
+        if (v.ram_gb) fd.append(`variants[${i}][ram_gb]`, v.ram_gb);
+        if (v.processor) fd.append(`variants[${i}][processor]`, v.processor);
+        if (v.screen_size) fd.append(`variants[${i}][screen_size]`, v.screen_size);
+        if (v.existing_image_id) fd.append(`variants[${i}][existing_image_id]`, v.existing_image_id.toString());
+        if (v.image_index !== null && v.image_index !== undefined) {
+          fd.append(`variants[${i}][image_index]`, String(v.image_index));
+        }
       });
-      const prodRes = await fetchAdminProduct(id);
-      setGroup(prodRes);
-      setEditVariantModal(null);
-      success("Variant updated");
-    } catch (err) {
-      showError("Failed to update variant");
+      
+      deletedVariants.forEach(vid => {
+        fd.append('deleted_variants[]', vid.toString());
+      });
+      deletedImages.forEach(iid => {
+        fd.append('deleted_images[]', iid.toString());
+      });
+
+      images.forEach((img) => {
+        fd.append('images[]', img);
+      });
+
+      const res = await updateAdminProduct(id, fd);
+      success("Product updated successfully!");
+      router.push("/admin/products");
+    } catch (err: any) {
+      console.error(err);
+      showError(err.response?.data?.message || "Failed to update product");
+    } finally {
+      setSaving(false);
     }
   };
 
-  if (loading) return <div className="p-12 text-center text-gray-500">Loading editor...</div>;
-  if (!group) return <div className="p-12 text-center text-red-500">Failed to load product.</div>;
+  if (loading) return <div className="p-12 text-center text-gray-500 flex justify-center"><Loader2 className="animate-spin text-primary" /></div>;
 
-  // Derive Preview Data
-  const previewConfig = group.configurations?.[0];
-  const previewVariant = previewConfig?.variants?.[0];
-  const previewImage = previewConfig?.images?.[0];
-  const allColors = [...new Set(previewConfig?.variants?.map((v:any) => v.color).filter(Boolean))] as string[];
+  const allCategories: any[] = metadata?.categories || [];
+  const allowedCategories = ['Laptops', 'Smartphones', 'Monitors', 'Accessories'];
+  const topLevelCategories = allCategories.filter((c: any) => allowedCategories.includes(c.name));
+  const selectedCategory = allCategories.find((c: any) => c.id == formData.category_id);
+  const selectedCategoryName = selectedCategory?.name;
+  const isAccessories = selectedCategoryName === 'Accessories';
+
+  const accessoriesCategory = allCategories.find((c: any) => c.name === 'Accessories');
+  const subcategories: any[] = accessoriesCategory?.children || [];
+
+  let allowedBrands: any[] = [];
+  if (isAccessories) {
+    allowedBrands = [];
+  } else if (selectedCategory?.parent_id === accessoriesCategory?.id) {
+    allowedBrands = selectedCategory?.brands || [];
+  } else if (selectedCategory) {
+    allowedBrands = selectedCategory?.brands || [];
+  }
+
+  const filteredBrands = allowedBrands;
+  const filteredSeries = (metadata?.series || []).filter((s: any) =>
+    s.brand_id == formData.brand_id &&
+    s.category_id == formData.category_id
+  );
+  const showSeries = filteredSeries.length > 0;
+
+  const handleCategoryChange = (val: string | number) => {
+    const cat = allCategories.find((c: any) => c.id == val);
+    const isAcc = cat?.name === 'Accessories';
+    setSubcategoryVisible(isAcc);
+    setFormData({ ...formData, category_id: String(val), brand_id: "", series_id: "" });
+  };
+
+  const handleSubcategoryChange = (val: string | number) => {
+    setFormData({ ...formData, category_id: String(val), brand_id: "", series_id: "" });
+  };
+
+  const isLaptop = selectedCategoryName?.toLowerCase().includes('laptop') || false;
+  const isPhone = selectedCategoryName?.toLowerCase().includes('smartphone') || selectedCategoryName?.toLowerCase() === 'smartphones' || false;
+  const showSpecs = isLaptop || isPhone;
 
   return (
-    <div className="p-6 lg:p-8 max-w-[1600px] mx-auto pb-32">
-      <ConfirmModal 
-        {...modalConfig} 
-        onClose={() => setModalConfig(prev => ({ ...prev, isOpen: false }))} 
+    <div className="p-6 lg:p-8 max-w-[1200px] mx-auto pb-32">
+      <ConfirmModal
+        {...modalConfig}
+        onClose={() => setModalConfig(prev => ({ ...prev, isOpen: false }))}
       />
-      {/* Header */}
+      
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-4">
           <Link href="/admin/products" className="w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-gray-200 text-gray-500 hover:text-gray-900 transition-colors">
             <ArrowLeft className="w-4 h-4" />
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">{group.name}</h1>
-            <p className="text-[13px] text-gray-500 mt-0.5">{group.configurations?.length} Configurations • {group.configurations?.reduce((acc: number, c:any) => acc + c.variants.length, 0)} Variants</p>
+            <div className="flex items-center gap-2 text-[12px] text-gray-500 font-medium mb-1">
+              <Link href="/admin/products" className="hover:text-gray-900 transition-colors">Products</Link>
+              <span>/</span>
+              <span>New product</span>
+            </div>
+            <h1 className="text-[22px] font-bold text-gray-900 tracking-[-0.03em]">Add product</h1>
           </div>
+        </div>
+        
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => handleUpdate('draft')}
+            disabled={saving || !formData.name || !formData.brand_id || !formData.category_id || !formData.variants[0].price}
+            className="px-4 py-2 border border-gray-200 bg-white text-gray-700 text-[13px] font-medium rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+          >
+            Save as draft
+          </button>
+          <button
+            onClick={() => handleUpdate('active')}
+            disabled={saving || !formData.name || !formData.brand_id || !formData.category_id || !formData.variants[0].price}
+            className="inline-flex items-center gap-2 bg-gray-900 text-white px-5 py-2 rounded-lg text-[13px] font-medium hover:bg-gray-800 transition-colors disabled:opacity-50"
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+            {saving ? 'Publishing...' : 'Publish'}
+          </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Main Content Area */}
-        <div className="lg:col-span-2 space-y-6">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        
+        {/* Left Column (Main Form) */}
+        <div className="xl:col-span-2 space-y-6">
           
-          {/* Tabs */}
-          <div className="flex items-center gap-6 border-b border-gray-200">
-            {(['overview', 'configurations', 'images'] as const).map(tab => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`pb-3 text-[14px] font-medium capitalize transition-colors relative ${
-                  activeTab === tab ? 'text-gray-900' : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                {tab}
-                {activeTab === tab && (
-                  <div className="absolute bottom-[-1px] left-0 right-0 h-[2px] bg-gray-900 rounded-t" />
-                )}
-              </button>
-            ))}
-          </div>
-
-          {/* Tab Content */}
+          {/* Basic Information */}
           <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-6">
+            <h2 className="text-[14px] font-semibold text-gray-900 mb-5">Basic information</h2>
             
-            {activeTab === 'overview' && (
-              <div className="space-y-6">
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="col-span-2">
-                    <label className="block text-[12px] font-medium text-gray-700 mb-1.5">Product Name</label>
-                    <input
-                      type="text"
-                      value={formData.name}
-                      onChange={(e) => setFormData({...formData, name: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+            <div className="space-y-5">
+              <div>
+                <label className="block text-[12px] font-medium text-gray-700 mb-1.5">Product name</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Samsung Galaxy S26 Ultra"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-5">
+                <div>
+                  <label className="block text-[12px] font-medium text-gray-700 mb-1.5">Category</label>
+                  <CategorySelector
+                    value={isAccessories ? formData.category_id : (selectedCategory?.parent_id === accessoriesCategory?.id ? String(accessoriesCategory?.id || '') : formData.category_id)}
+                    onChange={handleCategoryChange}
+                    categories={topLevelCategories}
+                  />
+                </div>
+                
+                {/* Subcategory */}
+                {(isAccessories || selectedCategory?.parent_id === accessoriesCategory?.id) ? (
+                  <div>
+                    <label className="block text-[12px] font-medium text-gray-700 mb-1.5">Subcategory</label>
+                    <CustomSelect
+                      value={selectedCategory?.parent_id === accessoriesCategory?.id ? formData.category_id : ""}
+                      onChange={handleSubcategoryChange}
+                      placeholder="Select subcategory..."
+                      options={subcategories.map((s: any) => ({ value: s.id, label: s.name }))}
                     />
                   </div>
-                  
+                ) : (
                   <div>
                     <label className="block text-[12px] font-medium text-gray-700 mb-1.5">Brand</label>
-                    <BrandSelector 
-                      value={formData.brand_id} 
-                      onChange={(val) => setFormData({...formData, brand_id: String(val)})} 
-                      brands={metadata?.brands || []} 
+                    <BrandSelector
+                      value={formData.brand_id}
+                      onChange={(val) => setFormData({ ...formData, brand_id: String(val), series_id: "" })}
+                      brands={filteredBrands}
                     />
                   </div>
+                )}
+              </div>
 
+              {/* Brand for accessories subcategory, or Series */}
+              <div className="grid grid-cols-2 gap-5">
+                {(isAccessories || selectedCategory?.parent_id === accessoriesCategory?.id) && filteredBrands.length > 0 && (
                   <div>
-                    <label className="block text-[12px] font-medium text-gray-700 mb-1.5">Category</label>
-                    <CategorySelector 
-                      value={formData.category_id} 
-                      onChange={(val) => setFormData({...formData, category_id: String(val)})} 
-                      categories={metadata?.categories || []} 
+                    <label className="block text-[12px] font-medium text-gray-700 mb-1.5">Brand</label>
+                    <BrandSelector
+                      value={formData.brand_id}
+                      onChange={(val) => setFormData({ ...formData, brand_id: String(val), series_id: "" })}
+                      brands={filteredBrands}
                     />
                   </div>
+                )}
 
+                {showSeries && (
                   <div>
                     <label className="block text-[12px] font-medium text-gray-700 mb-1.5">Series</label>
                     <CustomSelect
                       value={formData.series_id}
-                      onChange={(val) => setFormData({...formData, series_id: String(val)})}
-                      placeholder="None"
-                      options={(metadata?.series || [])
-                        .filter((s:any) => !formData.brand_id || s.brand_id == formData.brand_id)
-                        .map((s:any) => ({ value: s.id, label: s.name }))}
+                      onChange={(val) => setFormData({ ...formData, series_id: String(val) })}
+                      placeholder="None (Standalone Product)"
+                      options={filteredSeries.map((s: any) => ({ value: s.id, label: s.name }))}
                     />
                   </div>
-
-                  <div>
-                    <label className="block text-[12px] font-medium text-gray-700 mb-1.5">Status</label>
-                    <CustomSelect
-                      value={formData.status}
-                      onChange={(val) => setFormData({...formData, status: String(val)})}
-                      placeholder="Select Status"
-                      options={[
-                        { value: 'active', label: 'Active' },
-                        { value: 'draft', label: 'Draft' },
-                        { value: 'archived', label: 'Archived' }
-                      ]}
-                    />
-                  </div>
-
-                  <div className="col-span-2">
-                    <label className="block text-[12px] font-medium text-gray-700 mb-1.5">Description</label>
-                    <textarea
-                      value={formData.description}
-                      onChange={(e) => setFormData({...formData, description: e.target.value})}
-                      rows={4}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                    />
-                  </div>
-                </div>
-
-                <div className="pt-4 flex justify-between items-center text-[12px] text-gray-500">
-                  <p>Changes to these fields are saved automatically.</p>
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'configurations' && (
-              <div className="space-y-4">
-                {group.configurations?.map((config: any) => {
-                  const minPrice = config.variants?.length ? Math.min(...config.variants.map((v:any) => v.price)) : 0;
-                  const totalStock = config.variants?.reduce((sum:number, v:any) => sum + v.stock_quantity, 0) || 0;
-                  const isExpanded = expandedConfigs[config.id];
-
-                  return (
-                    <div key={config.id} className="border border-gray-200 rounded-xl overflow-hidden bg-white">
-                      {/* Config Header */}
-                      <div 
-                        onClick={() => toggleConfig(config.id)}
-                        className="px-5 py-4 bg-gray-50/50 flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors"
-                      >
-                        <div>
-                          <h3 className="text-[14px] font-bold text-gray-900">{getConfigLabel(config.variants)}</h3>
-                          <p className="text-[12px] text-gray-500 mt-1">Starting at {formatPrice(minPrice)} MAD • {totalStock} units in stock</p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className="text-[12px] font-medium text-gray-400">{config.variants?.length} variants</span>
-                          <button 
-                            onClick={(e) => handleDeleteConfiguration(config.id, e)}
-                            className="w-6 h-6 rounded flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-                            title="Delete Configuration"
-                          >
-                            <div className="relative w-3.5 h-3.5 opacity-60 group-hover:opacity-100">
-                              <Image src="/images/UI/trash-bin.png" alt="Delete" fill className="object-contain" />
-                            </div>
-                          </button>
-                          {isExpanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
-                        </div>
-                      </div>
-
-                      {/* Variants Table */}
-                      {isExpanded && (
-                        <div className="border-t border-gray-200 p-4">
-                          <table className="w-full text-left border-collapse">
-                            <thead>
-                              <tr className="text-[11px] text-gray-400 uppercase tracking-wider border-b border-gray-100">
-                                <th className="pb-3 font-medium">Variant</th>
-                                <th className="pb-3 font-medium">Price (MAD)</th>
-                                <th className="pb-3 font-medium">Stock</th>
-                                <th className="pb-3 font-medium">Image</th>
-                                <th className="pb-3 font-medium">SKU</th>
-                                <th className="pb-3 font-medium text-right">Actions</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                              {config.variants?.map((v: any) => (
-                                <tr key={v.id} className="hover:bg-gray-50/30">
-                                  <td className="py-3 pr-4">
-                                    <span className="text-[13px] font-medium text-gray-900">{getVariantLabel(v)}</span>
-                                  </td>
-                                  <td className="py-3 pr-4">
-                                    <input 
-                                      type="number"
-                                      defaultValue={v.price}
-                                      onBlur={async (e) => {
-                                        if (e.target.value && e.target.value !== v.price?.toString()) {
-                                          try {
-                                            await updateAdminVariant(v.id, { ...v, price: Number(e.target.value) });
-                                            success("Price updated");
-                                            const prodRes = await fetchAdminProduct(id);
-                                            setGroup(prodRes);
-                                          } catch (err) {
-                                            showError("Failed to update price");
-                                            e.target.value = v.price;
-                                          }
-                                        }
-                                      }}
-                                      className="w-24 px-2 py-1 border border-transparent hover:border-gray-200 focus:border-primary focus:ring-1 focus:ring-primary rounded text-[13px] text-gray-900 bg-transparent focus:bg-white transition-all -ml-2"
-                                    />
-                                  </td>
-                                  <td className="py-3 pr-4">
-                                    <input 
-                                      type="number"
-                                      defaultValue={v.stock_quantity}
-                                      onBlur={async (e) => {
-                                        if (e.target.value && e.target.value !== v.stock_quantity?.toString()) {
-                                          try {
-                                            await updateAdminVariant(v.id, { ...v, stock_quantity: Number(e.target.value) });
-                                            success("Stock updated");
-                                            const prodRes = await fetchAdminProduct(id);
-                                            setGroup(prodRes);
-                                          } catch (err) {
-                                            showError("Failed to update stock");
-                                            e.target.value = v.stock_quantity;
-                                          }
-                                        }
-                                      }}
-                                      className={`w-20 px-2 py-1 border border-transparent hover:border-gray-200 focus:border-primary focus:ring-1 focus:ring-primary rounded text-[13px] font-medium bg-transparent focus:bg-white transition-all -ml-2 ${
-                                        v.stock_quantity > 0 ? 'text-emerald-700' : 'text-red-700'
-                                      }`}
-                                    />
-                                  </td>
-                                  <td className="py-3 pr-4">
-                                    {v.product_image_id && config.images?.find((i:any) => i.id === v.product_image_id) ? (
-                                      <div className="w-8 h-8 rounded bg-gray-50 border border-gray-200 overflow-hidden relative">
-                                        <Image unoptimized src={getImageUrl(config.images.find((i:any) => i.id === v.product_image_id).url)} alt="" fill className="object-contain" />
-                                      </div>
-                                    ) : (
-                                      <span className="text-[12px] text-gray-400">—</span>
-                                    )}
-                                  </td>
-                                  <td className="py-3 pr-4">
-                                    <span className="text-[12px] font-mono text-gray-500">{v.sku}</span>
-                                  </td>
-                                  <td className="py-3 text-right">
-                                    <button 
-                                      onClick={() => {
-                                        setAddVariantModal(config.id);
-                                        setNewVariantData({
-                                          price: v.price?.toString() || '',
-                                          stock: '0',
-                                          color: v.color || '',
-                                          storage_gb: v.storage_gb?.toString() || '',
-                                          ram_gb: v.ram_gb?.toString() || '',
-                                          processor: v.processor || '',
-                                          product_image_id: v.product_image_id?.toString() || ''
-                                        });
-                                      }}
-                                      className="text-gray-400 hover:text-primary transition-colors p-1" 
-                                      title="Duplicate"
-                                    >
-                                      <Copy className="w-4 h-4" />
-                                    </button>
-                                    <button 
-                                      onClick={() => {
-                                        setEditVariantModal(v);
-                                        setEditVariantData({
-                                          price: v.price?.toString() || '',
-                                          stock: v.stock_quantity?.toString() || '0',
-                                          color: v.color || '',
-                                          storage_gb: v.storage_gb?.toString() || '',
-                                          ram_gb: v.ram_gb?.toString() || '',
-                                          processor: v.processor || '',
-                                          product_image_id: v.product_image_id?.toString() || ''
-                                        });
-                                      }}
-                                      className="text-gray-400 hover:text-primary transition-colors p-1 ml-1" 
-                                      title="Edit"
-                                    >
-                                      <div className="relative w-4 h-4 opacity-60 hover:opacity-100">
-                                        <Image src="/images/UI/pencil(1).png" alt="Edit" fill className="object-contain" />
-                                      </div>
-                                    </button>
-                                    <button onClick={() => handleDeleteVariant(v.id)} className="text-gray-400 hover:text-red-500 transition-colors p-1 ml-1" title="Delete">
-                                      <div className="relative w-4 h-4 opacity-60 hover:opacity-100">
-                                        <Image src="/images/UI/trash-bin.png" alt="Delete" fill className="object-contain" />
-                                      </div>
-                                    </button>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                          <div className="mt-4 pt-4 border-t border-gray-100">
-                            <button 
-                              onClick={() => setAddVariantModal(config.id)}
-                              className="text-[13px] font-medium text-primary hover:text-primary-hover inline-flex items-center gap-1.5 transition-colors"
-                            >
-                              <Plus className="w-4 h-4" /> Add Variant
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-                <button 
-                  onClick={() => setAddConfigModal(true)}
-                  className="w-full py-4 border-2 border-dashed border-gray-200 rounded-xl text-[13px] font-medium text-gray-500 hover:text-gray-900 hover:border-gray-300 hover:bg-gray-50 transition-all flex flex-col items-center justify-center gap-2"
-                >
-                  <Plus className="w-5 h-5" />
-                  Add Configuration
-                </button>
-              </div>
-            )}
-
-            {activeTab === 'images' && (
-              <div className="space-y-8">
-                {group.configurations?.map((config: any) => (
-                  <div key={config.id}>
-                    <h3 className="text-[14px] font-bold text-gray-900 mb-4">{getConfigLabel(config.variants)}</h3>
-                    {config.images?.length > 0 ? (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                        {config.images.map((img: any) => (
-                          <div key={img.id} className="relative aspect-square border border-gray-200 rounded-lg overflow-hidden group bg-gray-50">
-                            <Image unoptimized src={getImageUrl(img.url)} alt="" fill className="object-contain p-2" sizes="200px" />
-                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-2">
-                              <div className="flex justify-end">
-                                <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleDeleteImage(img.id);
-                                      }}
-                                      className="w-6 h-6 rounded-md bg-white/90 text-red-500 shadow-sm flex items-center justify-center hover:bg-red-50 transition-colors"
-                                    >
-                                      <div className="relative w-3.5 h-3.5">
-                                        <Image src="/images/UI/trash-bin.png" alt="Delete" fill className="object-contain" />
-                                      </div>
-                                    </button>
-                              </div>
-                              <span className="text-[10px] font-medium text-white bg-black/50 px-1.5 py-0.5 rounded w-fit">Order: {img.sort_order}</span>
-                            </div>
-                          </div>
-                        ))}
-                        <label className="aspect-square border-2 border-dashed border-gray-200 rounded-lg flex flex-col items-center justify-center text-gray-400 hover:text-primary hover:border-primary/50 hover:bg-primary/5 transition-all cursor-pointer">
-                          <ImageIcon className="w-6 h-6 mb-2" />
-                          <span className="text-[12px] font-medium">Add Image</span>
-                          <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(e, config.id)} />
-                        </label>
-                      </div>
-                    ) : (
-                      <div className="p-8 border-2 border-dashed border-gray-200 rounded-xl text-center">
-                        <ImageIcon className="w-8 h-8 text-gray-300 mx-auto mb-3" />
-                        <p className="text-[13px] font-medium text-gray-900 mb-1">No images uploaded</p>
-                        <p className="text-[12px] text-gray-500 mb-4">Upload images for this configuration</p>
-                        <label className="inline-flex items-center gap-2 bg-white border border-gray-200 text-gray-700 px-4 py-2 rounded-lg text-[12px] font-medium hover:bg-gray-50 transition-colors cursor-pointer">
-                          <Plus className="w-3.5 h-3.5" /> Upload Image
-                          <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(e, config.id)} />
-                        </label>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Storefront Preview Panel */}
-        <div className="lg:col-span-1">
-          <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-5 sticky top-8">
-            <h3 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-5 flex items-center gap-2">
-              <Eye className="w-3.5 h-3.5" /> Storefront Preview
-            </h3>
-            
-            <div className="border border-gray-100 rounded-lg p-4 bg-gray-50/30">
-              <div className="aspect-square bg-white rounded-lg border border-gray-100 mb-4 relative overflow-hidden flex items-center justify-center">
-                {previewImage ? (
-                  <Image unoptimized src={getImageUrl(previewImage.url)} alt="" fill className="object-contain p-4" sizes="250px" />
-                ) : (
-                  <ImageIcon className="w-8 h-8 text-gray-200" />
                 )}
               </div>
-              
-              <p className="text-[11px] text-gray-500 uppercase tracking-wide mb-1">{group.brand?.name}</p>
-              <h4 className="text-[15px] font-bold text-gray-900 leading-tight mb-2">{group.name}</h4>
-              
-              {previewVariant && (
-                <p className="text-[18px] font-bold text-gray-900 mb-4">
-                  {Number(previewVariant.price).toLocaleString()} <span className="text-[12px] font-normal text-gray-500 tracking-wide">MAD</span>
-                </p>
-              )}
 
-              {allColors.length > 0 && (
-                <div className="mb-4">
-                  <p className="text-[11px] font-medium text-gray-500 uppercase tracking-wide mb-2">Colors</p>
-                  <div className="flex gap-2">
-                    {allColors.map(color => {
-                      let hex = '#ccc';
-                      if (color.startsWith('#')) {
-                        hex = color;
-                      } else if (color.toLowerCase() === 'black' || color.toLowerCase() === 'space black') {
-                        hex = '#000';
-                      } else if (color.toLowerCase() === 'silver') {
-                        hex = '#e3e4e5';
-                      } else if (color.toLowerCase() === 'white' || color.toLowerCase() === 'starlight') {
-                        hex = '#f4f4f4';
-                      }
-                      
-                      return (
-                        <div key={color} className="w-6 h-6 rounded-full border border-gray-200" title={color} style={{ backgroundColor: hex }} />
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {group.configurations?.length > 1 && (
-                <div>
-                  <p className="text-[11px] font-medium text-gray-500 uppercase tracking-wide mb-2">Configurations</p>
-                  <div className="flex flex-wrap gap-2">
-                    {group.configurations.map((c:any) => (
-                      <span key={c.id} className="px-2 py-1 bg-white border border-gray-200 rounded text-[11px] font-medium text-gray-700">
-                        {getConfigLabel(c.variants)}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-              
-              <button className="w-full mt-6 py-2.5 bg-gray-900 text-white rounded-lg text-[13px] font-medium opacity-80 cursor-default">
-                Add to cart
-              </button>
-            </div>
-            <p className="text-[11px] text-center text-gray-400 mt-4 leading-relaxed">
-              This is a simplified preview of how the customer sees the grouped configurations.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Add Configuration Modal */}
-      {addConfigModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-              <h3 className="text-[15px] font-bold text-gray-900">Add Configuration</h3>
-              <button onClick={() => setAddConfigModal(false)} className="text-gray-400 hover:text-gray-600">×</button>
-            </div>
-            <div className="p-6 space-y-4">
               <div>
-                <label className="block text-[12px] font-medium text-gray-700 mb-1.5">Price (MAD)</label>
+                <label className="block text-[12px] font-medium text-gray-700 mb-1.5">Description</label>
+                <textarea
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  placeholder="Short product description"
+                  rows={4}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Configuration (Default Variant) */}
+          <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-6">
+            <h2 className="text-[14px] font-semibold text-gray-900 mb-5">Configuration <span className="text-[11px] font-normal text-gray-400 ml-1">(of the 1st variant)</span></h2>
+            
+            <div className="grid grid-cols-2 gap-5">
+              <div>
+                <label className="block text-[12px] font-medium text-gray-700 mb-1.5">Price</label>
                 <input
                   type="number"
-                  value={newConfigData.price}
-                  onChange={(e) => setNewConfigData({...newConfigData, price: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[13px] focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                  placeholder="0.00"
+                  placeholder="e.g. 4498"
+                  value={formData.variants[0].price}
+                  onChange={(e) => updateVariant(0, 'price', e.target.value)}
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                 />
               </div>
-            </div>
-            <div className="px-6 py-4 bg-gray-50 flex justify-end gap-3 border-t border-gray-100">
-              <button onClick={() => setAddConfigModal(false)} className="px-4 py-2 text-[13px] font-medium text-gray-600 hover:text-gray-900">Cancel</button>
-              <button onClick={handleCreateConfig} className="px-4 py-2 bg-gray-900 text-white rounded-lg text-[13px] font-medium hover:bg-gray-800">Add Configuration</button>
+
+              <div>
+                <label className="block text-[12px] font-medium text-gray-700 mb-1.5">Stock</label>
+                <input
+                  type="number"
+                  placeholder="18"
+                  value={formData.variants[0].stock_quantity}
+                  onChange={(e) => updateVariant(0, 'stock_quantity', e.target.value)}
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                />
+              </div>
+              
+              <div className="col-span-2">
+                <label className="block text-[12px] font-medium text-gray-700 mb-1.5">Base color</label>
+                <ColorPickerField
+                  value={formData.variants[0].color}
+                  onChange={(val) => updateVariant(0, 'color', val)}
+                />
+              </div>
             </div>
           </div>
-        </div>
-      )}
 
-      {/* Add Variant Modal */}
-      {addVariantModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg">
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-              <h3 className="text-[15px] font-bold text-gray-900">Add Variant</h3>
-              <button onClick={() => setAddVariantModal(null)} className="text-gray-400 hover:text-gray-600">×</button>
+          {/* Specifications */}
+          {showSpecs && (
+            <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-6">
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="text-[14px] font-semibold text-gray-900">Specifications</h2>
+                <div className="flex gap-2">
+                  <span className="px-3 py-1 bg-gray-50 border border-gray-200 rounded-full text-[11px] font-medium text-gray-600">
+                    {isLaptop ? 'Laptop' : 'Smartphone'}
+                  </span>
+                </div>
+              </div>
+              <p className="text-[11px] text-gray-500 mb-5">Fields adapt automatically to the selected category.</p>
+              
+              <div className="grid grid-cols-2 gap-5">
+                <div>
+                  <label className="block text-[12px] font-medium text-gray-700 mb-1.5">Storage</label>
+                  <CustomSelect
+                    value={formData.variants[0].storage_gb || ""}
+                    onChange={(val) => updateVariant(0, 'storage_gb', String(val))}
+                    options={[
+                      { value: "64", label: "64 GB" },
+                      { value: "128", label: "128 GB" },
+                      { value: "256", label: "256 GB" },
+                      { value: "512", label: "512 GB" },
+                      { value: "1000", label: "1 TB" },
+                      { value: "2000", label: "2 TB" },
+                      { value: "4000", label: "4 TB" }
+                    ]}
+                    placeholder="Select storage"
+                  />
+                </div>
+                
+                {isLaptop && (
+                  <>
+                    <div>
+                      <label className="block text-[12px] font-medium text-gray-700 mb-1.5">RAM</label>
+                      <CustomSelect
+                        value={formData.variants[0].ram_gb || ""}
+                        onChange={(val) => updateVariant(0, 'ram_gb', String(val))}
+                        options={[
+                          { value: "8", label: "8 GB" },
+                          { value: "16", label: "16 GB" },
+                          { value: "24", label: "24 GB" },
+                          { value: "32", label: "32 GB" },
+                          { value: "64", label: "64 GB" },
+                          { value: "128", label: "128 GB" }
+                        ]}
+                        placeholder="Select RAM"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[12px] font-medium text-gray-700 mb-1.5">Screen size</label>
+                      <CustomSelect
+                        value={formData.variants[0].screen_size || ""}
+                        onChange={(val) => updateVariant(0, 'screen_size', String(val))}
+                        options={[
+                          { value: "13", label: '13"' },
+                          { value: "13.6", label: '13.6"' },
+                          { value: "14", label: '14"' },
+                          { value: "15", label: '15"' },
+                          { value: "16", label: '16"' }
+                        ]}
+                        placeholder="Select screen size"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[12px] font-medium text-gray-700 mb-1.5">Processor</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. M4 Pro"
+                        value={formData.variants[0].processor || ""}
+                        onChange={(e) => updateVariant(0, 'processor', e.target.value)}
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-[13px] bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
-            <div className="p-6 grid grid-cols-2 gap-4">
-              <div className="col-span-2 sm:col-span-1">
-                <label className="block text-[12px] font-medium text-gray-700 mb-1.5">Price (MAD)</label>
-                <input type="number" value={newVariantData.price} onChange={(e) => setNewVariantData({...newVariantData, price: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[13px]" />
-              </div>
-              <div className="col-span-2 sm:col-span-1">
-                <label className="block text-[12px] font-medium text-gray-700 mb-1.5">Stock</label>
-                <input type="number" value={newVariantData.stock} onChange={(e) => setNewVariantData({...newVariantData, stock: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[13px]" />
-              </div>
-              <div className="col-span-2">
-                <label className="block text-[12px] font-medium text-gray-700 mb-1.5">Color</label>
-                <ColorPickerField 
-                  value={newVariantData.color} 
-                  onChange={(val) => setNewVariantData({...newVariantData, color: val})} 
-                />
-              </div>
-              {(() => {
-                const catName = group?.category?.name?.toLowerCase() || "";
-                const isLaptop = catName.includes('laptop');
-                const isPhone = catName.includes('phone') || catName.includes('smartphone');
-                if (!isLaptop && !isPhone) return null;
+          )}
 
-                return (
-                  <div className="col-span-2 border-t border-gray-100 pt-3 mt-1">
-                    <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wider mb-3">Tech Specs</p>
-                    <div className="grid grid-cols-3 gap-3">
-                      <div>
-                        <label className="block text-[11px] font-medium text-gray-600 mb-1">Storage (GB)</label>
-                        <input type="number" value={newVariantData.storage_gb} onChange={(e) => setNewVariantData({...newVariantData, storage_gb: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[13px]" />
+          {/* Image Gallery */}
+          <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-6">
+            <h2 className="text-[14px] font-semibold text-gray-900 mb-5">Image gallery</h2>
+            
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <button 
+                onClick={() => fileInputRef.current?.click()}
+                className="aspect-square border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center text-gray-400 hover:text-primary hover:border-primary/50 hover:bg-primary/5 transition-all"
+              >
+                <Upload className="w-6 h-6 mb-2" />
+                <span className="text-[11px] font-medium">Upload</span>
+              </button>
+              <input 
+                type="file" 
+                multiple 
+                accept="image/*"
+                className="hidden" 
+                ref={fileInputRef}
+                onChange={handleImageUpload}
+              />
+              
+              {existingImages.map((img) => (
+                      <div key={'ext-'+img.id} className="relative aspect-square rounded-xl overflow-hidden border border-gray-200 group bg-gray-50">
+                        <Image unoptimized src={getImageUrl(img.url)} alt="" fill className="object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => removeExistingImage(img.id)}
+                          className="absolute top-2 right-2 p-1.5 bg-white/90 backdrop-blur text-gray-700 hover:text-red-500 rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-all"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
                       </div>
-                      {isLaptop && (
-                        <>
-                          <div>
-                            <label className="block text-[11px] font-medium text-gray-600 mb-1">RAM (GB)</label>
-                            <input type="number" value={newVariantData.ram_gb} onChange={(e) => setNewVariantData({...newVariantData, ram_gb: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[13px]" />
-                          </div>
-                          <div>
-                            <label className="block text-[11px] font-medium text-gray-600 mb-1">Processor</label>
-                            <input type="text" value={newVariantData.processor} onChange={(e) => setNewVariantData({...newVariantData, processor: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[13px]" />
-                          </div>
-                        </>
-                      )}
+                    ))}
+                    {imagePreviews.map((preview, index) => (
+                <div key={index} className="aspect-square rounded-xl border border-gray-200 relative overflow-hidden group">
+                  <Image src={preview} alt="" fill className="object-contain p-2" />
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <button 
+                      onClick={() => removeImage(index)}
+                      className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center text-white backdrop-blur-sm transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+              
+              {/* Placeholders for empty slots */}
+              {Array.from({ length: Math.max(0, 3 - imagePreviews.length) }).map((_, i) => (
+                <div key={`placeholder-${i}`} className="aspect-square bg-gray-50 rounded-xl flex items-center justify-center">
+                  <ImageIcon className="w-6 h-6 text-gray-200" />
+                </div>
+              ))}
+            </div>
+          </div>
+          
+        </div>
+
+        {/* Right Column (Variants) */}
+        <div className="xl:col-span-1">
+          <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-5 sticky top-6">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-[14px] font-semibold text-gray-900">Variants</h2>
+              <button 
+                onClick={addVariant}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-lg text-[12px] font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" /> Add variant
+              </button>
+            </div>
+            
+            <div className="space-y-3">
+              {formData.variants.map((variant, index) => (
+                <div key={variant.id} className="p-3 border border-gray-100 rounded-xl bg-gray-50/50">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div 
+                        className="w-5 h-5 rounded-full shadow-sm border border-black/10"
+                        style={{ backgroundColor: variant.color ? (
+                          // Find the hex color from the value since variant.color stores the name (e.g. "Space Black")
+                          (() => {
+                            const ALL_COLORS = [
+                              { name: 'Black', hex: '#000000' }, { name: 'White', hex: '#ffffff' }, { name: 'Navy', hex: '#1a2238' }, { name: 'Pink', hex: '#f3d1d6' }, { name: 'Teal', hex: '#008080' }, { name: 'Ultramarine', hex: '#120a8f' }, { name: 'Intense Blue', hex: '#234e70' }, { name: 'Orange', hex: '#e37424' }, { name: 'Jade', hex: '#8b9c90' }, { name: 'Moonstone', hex: '#e3e0d8' }, { name: 'Violet', hex: '#a89eb6' }, { name: 'Cloud White', hex: '#f8f8f8' }, { name: 'Light Gold', hex: '#e8d8c8' }, { name: 'Lavender', hex: '#c9c2d6' }, { name: 'Mist Blue', hex: '#a8bccc' }, { name: 'Sage', hex: '#9ea996' },
+                              { name: 'Space Black', hex: '#2e2e2e' }, { name: 'Silver', hex: '#e3e4e5' }, { name: 'Starlight', hex: '#f0e4d3' }, { name: 'Midnight', hex: '#1c1f24' }, { name: 'Sky Blue', hex: '#b0c4de' },
+                              { name: 'Titanium Gray', hex: '#878681' }, { name: 'Titanium Violet', hex: '#5b5666' }, { name: 'Titanium Black', hex: '#3b3b3b' }, { name: 'Titanium Gold', hex: '#cfba9e' }, { name: 'Titanium Silver Blue', hex: '#8ea2b3' }, { name: 'Titanium White Silver', hex: '#e8e8e8' }, { name: 'Cobalt Violet', hex: '#483d8b' }, { name: 'Pink Gold', hex: '#f0dfdb' }, { name: 'Silver Shadow', hex: '#b2b6b9' },
+                              { name: 'Obsidian', hex: '#222222' }, { name: 'Porcelain', hex: '#f4f4f0' }, { name: 'Hazel', hex: '#4f5550' }, { name: 'Rose', hex: '#f1d6d2' }, { name: 'Aloe', hex: '#d4e1d1' }, { name: 'Peony', hex: '#e8b8c5' }, { name: 'Wintergreen', hex: '#b8c9c0' }
+                            ];
+                            return ALL_COLORS.find(c => c.name.toLowerCase() === variant.color.toLowerCase())?.hex || '#fff';
+                          })()
+                        ) : '#fff' }}
+                      />
+                      <span className="text-[12px] font-semibold text-gray-900">Variant {index + 1}</span>
+                    </div>
+                    {index > 0 && (
+                      <button 
+                        onClick={() => removeVariant(index)}
+                        className="text-gray-400 hover:text-red-500 transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3 mb-3">
+                    <div>
+                      <label className="block text-[10px] font-medium text-gray-500 mb-1">Price</label>
+                      <input
+                        type="number"
+                        value={variant.price}
+                        onChange={(e) => updateVariant(index, 'price', e.target.value)}
+                        className="w-full px-2 py-1.5 border border-gray-200 rounded text-[12px] focus:outline-none focus:border-primary"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-medium text-gray-500 mb-1">Stock</label>
+                      <input
+                        type="number"
+                        value={variant.stock_quantity}
+                        onChange={(e) => updateVariant(index, 'stock_quantity', e.target.value)}
+                        className="w-full px-2 py-1.5 border border-gray-200 rounded text-[12px] focus:outline-none focus:border-primary"
+                      />
                     </div>
                   </div>
-                );
-              })()}
-              <div className="col-span-2 border-t border-gray-100 pt-3 mt-1">
-                <label className="block text-[11px] font-medium text-gray-600 mb-2">Variant Image</label>
-                {(() => {
-                  const currentConfig = group.configurations?.find((c:any) => c.id === addVariantModal);
-                  if (!currentConfig || !currentConfig.images || currentConfig.images.length === 0) {
-                    return <p className="text-[12px] text-gray-500">No images available in this configuration. Upload images in the Images tab first.</p>;
-                  }
-                  return (
-                    <div className="flex gap-3 overflow-x-auto pb-2">
-                      <div 
-                        onClick={() => setNewVariantData({...newVariantData, product_image_id: ''})}
-                        className={`w-12 h-12 flex-shrink-0 rounded-lg border-2 flex items-center justify-center cursor-pointer transition-all ${
-                          !newVariantData.product_image_id ? 'border-primary bg-primary/5 text-primary' : 'border-gray-200 bg-gray-50 text-gray-400 hover:border-gray-300'
-                        }`}
-                      >
-                        <span className="text-[10px] font-medium">None</span>
-                      </div>
-                      {currentConfig.images.map((img:any) => (
-                        <div 
-                          key={img.id}
-                          onClick={() => setNewVariantData({...newVariantData, product_image_id: img.id.toString()})}
-                          className={`w-12 h-12 flex-shrink-0 rounded-lg border-2 cursor-pointer transition-all overflow-hidden relative ${
-                            newVariantData.product_image_id === img.id.toString() ? 'border-primary shadow-sm' : 'border-transparent hover:border-gray-300'
-                          }`}
-                        >
-                          <Image unoptimized src={getImageUrl(img.url)} alt="" fill className="object-cover" />
-                        </div>
-                      ))}
-                    </div>
-                  );
-                })()}
-              </div>
-            </div>
-            <div className="px-6 py-4 bg-gray-50 flex justify-end gap-3 border-t border-gray-100">
-              <button onClick={() => setAddVariantModal(null)} className="px-4 py-2 text-[13px] font-medium text-gray-600 hover:text-gray-900">Cancel</button>
-              <button onClick={handleCreateVariant} className="px-4 py-2 bg-gray-900 text-white rounded-lg text-[13px] font-medium hover:bg-gray-800">Add Variant</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Variant Modal */}
-      {editVariantModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg">
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-              <h3 className="text-[15px] font-bold text-gray-900">Edit Variant</h3>
-              <button onClick={() => setEditVariantModal(null)} className="text-gray-400 hover:text-gray-600">×</button>
-            </div>
-            <div className="p-6 grid grid-cols-2 gap-4">
-              <div className="col-span-2 sm:col-span-1">
-                <label className="block text-[12px] font-medium text-gray-700 mb-1.5">Price (MAD)</label>
-                <input type="number" value={editVariantData.price} onChange={(e) => setEditVariantData({...editVariantData, price: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[13px]" />
-              </div>
-              <div className="col-span-2 sm:col-span-1">
-                <label className="block text-[12px] font-medium text-gray-700 mb-1.5">Stock</label>
-                <input type="number" value={editVariantData.stock} onChange={(e) => setEditVariantData({...editVariantData, stock: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[13px]" />
-              </div>
-              <div className="col-span-2">
-                <label className="block text-[12px] font-medium text-gray-700 mb-1.5">Color</label>
-                <ColorPickerField 
-                  value={editVariantData.color} 
-                  onChange={(val) => setEditVariantData({...editVariantData, color: val})} 
-                />
-              </div>
-              {(() => {
-                const catName = group?.category?.name?.toLowerCase() || "";
-                const isLaptop = catName.includes('laptop');
-                const isPhone = catName.includes('phone') || catName.includes('smartphone');
-                if (!isLaptop && !isPhone) return null;
-
-                return (
-                  <div className="col-span-2 border-t border-gray-100 pt-3 mt-1">
-                    <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wider mb-3">Tech Specs</p>
-                    <div className="grid grid-cols-3 gap-3">
+                  
+                  {showSpecs && (
+                    <div className="grid grid-cols-2 gap-3 mb-3">
                       <div>
-                        <label className="block text-[11px] font-medium text-gray-600 mb-1">Storage (GB)</label>
-                        <input type="number" value={editVariantData.storage_gb} onChange={(e) => setEditVariantData({...editVariantData, storage_gb: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[13px]" />
+                        <label className="block text-[10px] font-medium text-gray-500 mb-1">Storage</label>
+                        <CustomSelect
+                          value={variant.storage_gb}
+                          onChange={(val) => updateVariant(index, 'storage_gb', String(val))}
+                          className="!h-[34px] !px-2 !py-1 !rounded text-[12px]"
+                          options={[
+                            { value: "64", label: "64 GB" },
+                            { value: "128", label: "128 GB" },
+                            { value: "256", label: "256 GB" },
+                            { value: "512", label: "512 GB" },
+                            { value: "1000", label: "1 TB" },
+                            { value: "2000", label: "2 TB" },
+                            { value: "4000", label: "4 TB" }
+                          ]}
+                          placeholder="Select..."
+                        />
                       </div>
                       {isLaptop && (
-                        <>
-                          <div>
-                            <label className="block text-[11px] font-medium text-gray-600 mb-1">RAM (GB)</label>
-                            <input type="number" value={editVariantData.ram_gb} onChange={(e) => setEditVariantData({...editVariantData, ram_gb: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[13px]" />
-                          </div>
-                          <div>
-                            <label className="block text-[11px] font-medium text-gray-600 mb-1">Processor</label>
-                            <input type="text" value={editVariantData.processor} onChange={(e) => setEditVariantData({...editVariantData, processor: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[13px]" />
-                          </div>
-                        </>
+                        <div>
+                          <label className="block text-[10px] font-medium text-gray-500 mb-1">RAM</label>
+                          <CustomSelect
+                            value={variant.ram_gb}
+                            onChange={(val) => updateVariant(index, 'ram_gb', String(val))}
+                            className="!h-[34px] !px-2 !py-1 !rounded text-[12px]"
+                            options={[
+                              { value: "8", label: "8 GB" },
+                              { value: "16", label: "16 GB" },
+                              { value: "24", label: "24 GB" },
+                              { value: "32", label: "32 GB" },
+                              { value: "64", label: "64 GB" },
+                              { value: "128", label: "128 GB" }
+                            ]}
+                            placeholder="Select..."
+                          />
+                        </div>
                       )}
                     </div>
+                  )}
+                  
+                  <div className="mb-3">
+                    <label className="block text-[10px] font-medium text-gray-500 mb-1">Color</label>
+                    <ColorPickerField
+                      value={variant.color}
+                      onChange={(val) => updateVariant(index, 'color', val)}
+                    />
                   </div>
-                );
-              })()}
-              <div className="col-span-2 border-t border-gray-100 pt-3 mt-1">
-                <label className="block text-[11px] font-medium text-gray-600 mb-2">Variant Image</label>
-                {(() => {
-                  const currentConfig = group.configurations?.find((c:any) => c.variants.some((v:any) => v.id === editVariantModal.id));
-                  if (!currentConfig || !currentConfig.images || currentConfig.images.length === 0) {
-                    return <p className="text-[12px] text-gray-500">No images available in this configuration. Upload images in the Images tab first.</p>;
-                  }
-                  return (
-                    <div className="flex gap-3 overflow-x-auto pb-2">
-                      <div 
-                        onClick={() => setEditVariantData({...editVariantData, product_image_id: ''})}
-                        className={`w-12 h-12 flex-shrink-0 rounded-lg border-2 flex items-center justify-center cursor-pointer transition-all ${
-                          !editVariantData.product_image_id ? 'border-primary bg-primary/5 text-primary' : 'border-gray-200 bg-gray-50 text-gray-400 hover:border-gray-300'
-                        }`}
-                      >
-                        <span className="text-[10px] font-medium">None</span>
+
+                  {existingImages.length > 0 && (
+                    <div className="mb-3">
+                      <label className="block text-[10px] font-medium text-gray-500 mb-1">Assigned Existing Image</label>
+                      <div className="flex gap-2 overflow-x-auto pb-1">
+                        {existingImages.map((img) => (
+                          <button
+                            key={'ext-v-'+img.id}
+                            onClick={() => { updateVariant(index, 'existing_image_id', variant.existing_image_id === img.id ? null : img.id); updateVariant(index, 'image_index', null); }}
+                            className={`relative w-10 h-10 rounded-md border-2 flex-shrink-0 overflow-hidden transition-all ${
+                              variant.existing_image_id === img.id ? 'border-primary' : 'border-transparent hover:border-gray-300'
+                            }`}
+                            type="button"
+                          >
+                            <Image unoptimized src={getImageUrl(img.url)} alt="" fill className="object-cover" />
+                          </button>
+                        ))}
                       </div>
-                      {currentConfig.images.map((img:any) => (
-                        <div 
-                          key={img.id}
-                          onClick={() => setEditVariantData({...editVariantData, product_image_id: img.id.toString()})}
-                          className={`w-12 h-12 flex-shrink-0 rounded-lg border-2 cursor-pointer transition-all overflow-hidden relative ${
-                            editVariantData.product_image_id === img.id.toString() ? 'border-primary shadow-sm' : 'border-transparent hover:border-gray-300'
-                          }`}
-                        >
-                          <Image unoptimized src={getImageUrl(img.url)} alt="" fill className="object-cover" />
-                        </div>
-                      ))}
                     </div>
-                  );
-                })()}
-              </div>
+                  )}
+
+                  {imagePreviews.length > 0 && (
+                    <div>
+                      <label className="block text-[10px] font-medium text-gray-500 mb-1">Assigned Image</label>
+                      <div className="flex gap-2 overflow-x-auto pb-1">
+                        {imagePreviews.map((preview, imgIndex) => (
+                          <button
+                            key={imgIndex}
+                            onClick={() => { updateVariant(index, 'image_index', variant.image_index === imgIndex ? null : imgIndex); updateVariant(index, "existing_image_id", null); }}
+                            className={`relative w-10 h-10 rounded-md border-2 flex-shrink-0 overflow-hidden transition-all ${
+                              variant.image_index === imgIndex ? 'border-primary' : 'border-transparent hover:border-gray-300'
+                            }`}
+                            title={`Assign Image ${imgIndex + 1}`}
+                          >
+                            <Image src={preview} alt="" fill className="object-cover" />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
-            <div className="px-6 py-4 bg-gray-50 flex justify-end gap-3 border-t border-gray-100">
-              <button onClick={() => setEditVariantModal(null)} className="px-4 py-2 text-[13px] font-medium text-gray-600 hover:text-gray-900">Cancel</button>
-              <button onClick={handleUpdateVariant} className="px-4 py-2 bg-gray-900 text-white rounded-lg text-[13px] font-medium hover:bg-gray-800">Save Changes</button>
-            </div>
+            
           </div>
         </div>
-      )}
-
+        
+      </div>
     </div>
   );
 }

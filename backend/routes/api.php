@@ -66,6 +66,7 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::post('/brands', [AdminController::class, 'createBrand']);
     Route::post('/brands/{id}', [AdminController::class, 'updateBrand']); // use POST for form-data (PUT/PATCH can have issues with multipart in PHP)
     Route::delete('/brands/{id}', [AdminController::class, 'deleteBrand']);
+    Route::post('/brands/{id}/categories/{categoryId}/toggle', [AdminController::class, 'toggleBrandCategory']);
 
     // Metadata
     Route::get('/metadata', [\App\Http\Controllers\Api\Admin\MetadataController::class, 'getMetadata']);

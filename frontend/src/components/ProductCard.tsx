@@ -302,7 +302,7 @@ export default function ProductCard({
           const configParts = [];
           if (v?.ram_gb) configParts.push(`${v.ram_gb}GB`);
           if (v?.storage_gb) {
-            configParts.push(v.storage_gb >= 1024 ? `${v.storage_gb / 1024}TB` : `${v.storage_gb}GB`);
+            configParts.push(v.storage_gb >= 1000 ? (v.storage_gb % 1024 === 0 ? `${v.storage_gb / 1024}TB` : `${v.storage_gb / 1000}TB`) : `${v.storage_gb}GB`);
           }
           if (configParts.length === 0) return null;
           return <p className="text-xs text-gray-500 mt-1">{configParts.join(' · ')}</p>;

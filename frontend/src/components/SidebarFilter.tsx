@@ -247,7 +247,7 @@ function FilterSection({
               let label = String(option.value);
               if (filterGroup.slug === "ram_gb") label += "GB";
               if (filterGroup.slug === "storage_gb") {
-                label = Number(option.value) >= 1024 ? `${Number(option.value) / 1024}TB` : `${option.value}GB`;
+                label = Number(option.value) >= 1000 ? (Number(option.value) % 1024 === 0 ? `${Number(option.value) / 1024}TB` : `${Number(option.value) / 1000}TB`) : `${option.value}GB`;
               }
               if (filterGroup.slug === "screen_size") label += '"';
 

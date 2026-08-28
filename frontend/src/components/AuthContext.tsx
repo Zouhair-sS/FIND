@@ -48,17 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await axios.post("/api/login", data);
     
     const res = await axios.get("/api/user");
-    const loggedInUser = res.data;
-    
-    if (typeof window !== "undefined" && loggedInUser) {
-      const savedCart = localStorage.getItem(`find_cart_v3_${loggedInUser.id}`);
-      const savedShipping = localStorage.getItem(`find_checkout_shipping_${loggedInUser.id}`);
-      if (savedCart) localStorage.setItem("find_cart_v3", savedCart);
-      if (savedShipping) localStorage.setItem("find_checkout_shipping", savedShipping);
-      window.dispatchEvent(new Event("reload-cart"));
-    }
-    
-    setUser(loggedInUser);
+    setUser(res.data);
   };
 
   const register = async (data: Record<string, unknown>) => {
@@ -74,17 +64,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       console.error("Logout failed on server, clearing local state");
     } finally {
-      if (typeof window !== "undefined" && user) {
-        const cart = localStorage.getItem("find_cart_v3");
-        const shipping = localStorage.getItem("find_checkout_shipping");
-        if (cart) localStorage.setItem(`find_cart_v3_${user.id}`, cart);
-        if (shipping) localStorage.setItem(`find_checkout_shipping_${user.id}`, shipping);
-        
-        localStorage.removeItem("find_cart_v3");
-        localStorage.removeItem("find_checkout_shipping");
+      setUser(null);
+      if (typeof window !== "undefined") {
         window.location.href = "/";
       }
-      setUser(null);
     }
   };
 

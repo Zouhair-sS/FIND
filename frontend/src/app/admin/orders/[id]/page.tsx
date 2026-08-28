@@ -349,7 +349,7 @@ export default function AdminOrderDetail() {
             <h2 className="text-[13px] font-semibold text-gray-900 mb-4">Order Items</h2>
             <div className="space-y-2.5">
               {order.items?.map((item: any) => {
-                const price = parseFloat(item.price);
+                const price = parseFloat(item.unit_price);
                 return (
                   <div
                     key={item.id}

@@ -135,7 +135,7 @@ export default function ProductDetailClient({ product }: { product: Product }) {
   const inStock = availableStock > 0;
   const stockLimit = availableStock;
 
-  const formatStorage = (gb: number) => (gb >= 1024 ? `${gb / 1024}TB` : `${gb}GB`);
+  const formatStorage = (gb: number) => (gb >= 1000 ? (gb % 1024 === 0 ? `${gb / 1024}TB` : `${gb / 1000}TB`) : `${gb}GB`);
 
   const handleColorChange = (color: string) => {
     setSelectedColor(color);

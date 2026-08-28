@@ -16,6 +16,7 @@ export default function AdminProducts() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [totalProducts, setTotalProducts] = useState(0);
 
   const [categories, setCategories] = useState<any[]>([]);
   const [brands, setBrands] = useState<any[]>([]);
@@ -44,6 +45,7 @@ export default function AdminProducts() {
       const res = await fetchAdminProducts(page, search, String(categoryId), String(stockStatus), String(brandId));
       setProducts(res.data);
       setTotalPages(res.last_page);
+      setTotalProducts(res.total);
     } catch (err) {
       console.error(err);
     } finally {
@@ -98,10 +100,16 @@ export default function AdminProducts() {
       </div>
 
       <div className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-gray-100 flex items-center justify-between gap-4">
-          <div className="relative w-full max-w-md">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
+        <div className="p-4 border-b border-gray-100 flex flex-col gap-3 bg-gray-50/50">
+          <div className="px-1">
+            <h2 className="text-[14px] font-bold text-gray-900 tracking-wide uppercase">
+              {totalProducts} ACTIVE PRODUCTS
+            </h2>
+          </div>
+          <div className="flex flex-col sm:flex-row items-center gap-3 w-full">
+              <div className="relative w-full sm:w-[280px] group">
+                <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary transition-colors" />
+              <input
               type="text"
               placeholder="Search products by name..."
               value={search}
@@ -109,9 +117,9 @@ export default function AdminProducts() {
                 setSearch(e.target.value);
                 setPage(1);
               }}
-              className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+              className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-full text-[13px] focus:outline-none focus:border-primary/30 focus:shadow-[0_4px_15px_rgba(0,35,102,0.05)] transition-all duration-300 placeholder:text-gray-400"
             />
-          </div>
+            </div>
           <div className="flex items-center gap-3">
             <CustomSelect
               value={brandId}
@@ -148,6 +156,7 @@ export default function AdminProducts() {
             />
           </div>
         </div>
+      </div>
 
         {/* Active Filters */}
         {(categoryId || brandId || stockStatus) && (
@@ -191,15 +200,16 @@ export default function AdminProducts() {
             <p className="text-[13px] text-gray-500 mt-1">Try adjusting your search or create a new product.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
+          <div className="overflow-auto max-h-[calc(100vh-250px)] relative">
+            <table className="w-full text-left border-separate border-spacing-0">
               <thead>
-                <tr className="text-[11px] text-gray-400 uppercase tracking-wider bg-gray-50/50">
-                  <th className="px-5 py-3 font-medium">Product</th>
-                  <th className="px-5 py-3 font-medium">Category / Brand</th>
-                  <th className="px-5 py-3 font-medium">Status</th>
-                  <th className="px-5 py-3 font-medium">Stock (Total)</th>
-                  <th className="px-5 py-3 font-medium text-right">Actions</th>
+                <tr className="text-[11px] text-gray-400 uppercase tracking-wider">
+                  <th className="px-5 py-3 font-medium bg-gray-50 sticky top-0 z-20 border-b border-gray-100 shadow-sm">Product</th>
+                  <th className="px-5 py-3 font-medium bg-gray-50 sticky top-0 z-20 border-b border-gray-100 shadow-sm">Category</th>
+                  <th className="px-5 py-3 font-medium bg-gray-50 sticky top-0 z-20 border-b border-gray-100 shadow-sm">Price</th>
+                  <th className="px-5 py-3 font-medium bg-gray-50 sticky top-0 z-20 border-b border-gray-100 shadow-sm">Stock</th>
+                  <th className="px-5 py-3 font-medium bg-gray-50 sticky top-0 z-20 border-b border-gray-100 shadow-sm">Status</th>
+                  <th className="px-5 py-3 font-medium text-right bg-gray-50 sticky top-0 z-20 border-b border-gray-100 shadow-sm w-12"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -225,39 +235,38 @@ export default function AdminProducts() {
                           <Link href={`/admin/products/${product.group_id}`} className="text-[14px] font-semibold text-gray-900 hover:text-primary transition-colors">
                             {product.name}
                           </Link>
-                          <p className="text-[11.5px] text-gray-500 font-medium tracking-wide mt-0.5 flex items-center gap-1.5">
-                            {product.configurations_count} {product.configurations_count === 1 ? 'configuration' : 'configurations'}
-                            <span className="text-gray-300">•</span>
-                            {product.variants_count} {product.variants_count === 1 ? 'variant' : 'variants'}
+                          <p className="text-[11.5px] text-gray-500 font-medium tracking-wide mt-0.5">
+                            {product.specs_summary || `${product.variants_count} variants`}
                           </p>
                         </div>
                       </div>
                     </td>
                     <td className="px-5 py-3.5">
                       <p className="text-[13px] text-gray-800 font-medium">{product.category?.name || "—"}</p>
-                      <p className="text-[12px] text-gray-500">{product.brand?.name || "—"}</p>
                     </td>
                     <td className="px-5 py-3.5">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium capitalize
-                        ${product.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 
-                          product.status === 'draft' ? 'bg-amber-50 text-amber-700' : 'bg-gray-100 text-gray-700'}`}>
-                        {product.status}
+                      <p className="text-[13px] text-gray-900 font-medium">
+                        {product.price_min === product.price_max
+                          ? `${new Intl.NumberFormat('fr-MA', { maximumFractionDigits: 0 }).format(product.price_min).replace(',', '.')} MAD`
+                          : `${new Intl.NumberFormat('fr-MA', { maximumFractionDigits: 0 }).format(product.price_min).replace(',', '.')} - ${new Intl.NumberFormat('fr-MA', { maximumFractionDigits: 0 }).format(product.price_max).replace(',', '.')} MAD`}
+                      </p>
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <span className="text-[13px] font-medium text-gray-900">
+                        {product.total_stock || 0}
                       </span>
                     </td>
                     <td className="px-5 py-3.5">
-                      <div className="flex items-center gap-2">
-                        <span className={`w-2 h-2 rounded-full ${
-                          product.total_stock > 10 ? 'bg-emerald-500' : 
-                          product.total_stock > 0 ? 'bg-amber-500' : 'bg-red-500'
-                        }`} />
-                        <span className="text-[13px] font-medium text-gray-900">
-                          {product.total_stock || 0}
-                        </span>
-                      </div>
+                      <span className={`inline-flex items-center gap-1.5 text-[12px] font-medium capitalize
+                        ${product.status === 'active' ? (product.total_stock > 10 ? 'text-emerald-600' : product.total_stock > 0 ? 'text-amber-600' : 'text-red-600') : 
+                          product.status === 'draft' ? 'text-amber-600' : 'text-gray-500'}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${product.status === 'active' ? (product.total_stock > 10 ? 'bg-emerald-500' : product.total_stock > 0 ? 'bg-amber-500' : 'bg-red-500') : product.status === 'draft' ? 'bg-amber-500' : 'bg-gray-400'}`} />
+                        {product.status === 'active' ? (product.total_stock > 10 ? 'In stock' : product.total_stock > 0 ? 'Low stock' : 'Out of stock') : product.status}
+                      </span>
                     </td>
                     <td className="px-5 py-3.5 text-right">
                       <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Link href={`/${product.slug}`} target="_blank" className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-colors" title="View Storefront">
+                        <Link href={`/product/${product.slug}`} target="_blank" className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-colors" title="View Storefront">
                           <ExternalLink className="w-4 h-4" />
                         </Link>
                         <Link href={`/admin/products/${product.group_id}`} className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-primary hover:bg-primary/5 transition-colors" title="Edit">
@@ -279,34 +288,7 @@ export default function AdminProducts() {
           </div>
         )}
 
-        {/* Footer info */}
-        <div className="p-4 border-t border-gray-100 flex items-center justify-between">
-          <p className="text-[13px] text-gray-500 font-medium">
-            Showing {products.length} products on this page
-          </p>
-
-          {totalPages > 1 && (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="px-3 py-1.5 rounded-lg border border-gray-200 text-[12px] font-medium text-gray-700 disabled:opacity-50 hover:bg-gray-50"
-              >
-                Previous
-              </button>
-              <span className="text-[12px] text-gray-500 font-medium px-2">
-                Page {page} of {totalPages}
-              </span>
-              <button
-                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
-                className="px-3 py-1.5 rounded-lg border border-gray-200 text-[12px] font-medium text-gray-700 disabled:opacity-50 hover:bg-gray-50"
-              >
-                Next
-              </button>
-            </div>
-          )}
-        </div>
+        {/* Footer removed */}
       </div>
     </div>
   );

@@ -19,7 +19,7 @@ class ProductController extends Controller
         $query = Product::with([
             'brand:id,name',
             'category:id,name',
-            'variants:id,product_id,price,stock_quantity',
+            'variants:id,product_id,price,stock_quantity,storage_gb,ram_gb',
             'images' => fn($q) => $q->orderBy('sort_order'),
         ]);
 
@@ -44,27 +44,42 @@ class ProductController extends Controller
 
         $products = $query->orderBy('name')->get();
 
-        // Group by storefront identity
-        $grouped = $products->groupBy(fn($p) => $p->name . '|' . ($p->series_id ?? 'null'));
+        $result = $products->map(function ($product) {
+            $allVariants = $product->variants;
+            $firstImage = $product->images->sortBy('sort_order')->first();
 
-        $result = $grouped->map(function ($group) {
-            $first = $group->first();
-            $allVariants = $group->flatMap(fn($p) => $p->variants);
-            $firstImage = $group->flatMap(fn($p) => $p->images)->sortBy('sort_order')->first();
+            $storageMin = $allVariants->min('storage_gb');
+            $storageMax = $allVariants->max('storage_gb');
+            
+            $specsSummary = null;
+            if ($storageMin && $storageMax) {
+                if ($storageMin === $storageMax) {
+                    $specsSummary = $storageMin >= 1000 ? ($storageMin / 1000) . 'TB' : $storageMin . 'GB';
+                } else {
+                    $minStr = $storageMin >= 1000 ? ($storageMin / 1000) . 'TB' : $storageMin . 'GB';
+                    $maxStr = $storageMax >= 1000 ? ($storageMax / 1000) . 'TB' : $storageMax . 'GB';
+                    $specsSummary = $minStr . ' - ' . $maxStr;
+                }
+            } else {
+                $specsSummary = $allVariants->count() . ' variant' . ($allVariants->count() !== 1 ? 's' : '');
+            }
 
             return [
-                'group_id' => $first->id,
-                'name' => $first->name,
-                'brand' => $first->brand,
-                'category' => $first->category,
-                'series_id' => $first->series_id,
-                'status' => $first->status,
-                'configurations_count' => $group->count(),
+                'id' => $product->id, // Replaces group_id for exact editing target
+                'group_id' => $product->id, // Fallback for any frontend components expecting group_id
+                'name' => $product->name,
+                'brand' => $product->brand,
+                'category' => $product->category,
+                'series_id' => $product->series_id,
+                'status' => $product->status,
+                'configurations_count' => 1,
                 'variants_count' => $allVariants->count(),
                 'total_stock' => $allVariants->sum('stock_quantity'),
                 'price_min' => $allVariants->count() > 0 ? (float) $allVariants->min('price') : 0,
                 'price_max' => $allVariants->count() > 0 ? (float) $allVariants->max('price') : 0,
+                'specs_summary' => $specsSummary,
                 'thumbnail' => $firstImage?->url,
+                'slug' => $product->slug,
             ];
         });
 
@@ -81,7 +96,7 @@ class ProductController extends Controller
         
         // Manual pagination over grouped results
         $page = max(1, (int) $request->get('page', 1));
-        $perPage = 15;
+        $perPage = 1000;
         $total = $result->count();
         $items = $result->forPage($page, $perPage)->values();
 
@@ -162,6 +177,9 @@ class ProductController extends Controller
             'variants.*.ram_gb' => 'nullable|integer',
             'variants.*.processor' => 'nullable|string',
             'variants.*.screen_size' => 'nullable|numeric',
+            'variants.*.image_index' => 'nullable|integer',
+            'images' => 'nullable|array',
+            'images.*' => 'image|max:5120',
         ]);
 
         $slug = Str::slug($validated['name']);
@@ -189,7 +207,26 @@ class ProductController extends Controller
             $product->update(['stock' => $product->variants()->sum('stock_quantity')]);
         }
 
-        return response()->json($product->load('variants'), 201);
+        $savedImages = [];
+        if ($request->hasFile('images')) {
+            foreach ($request->file('images') as $index => $file) {
+                $path = $file->store('products', 'public');
+                $savedImages[$index] = $product->images()->create([
+                    'url' => '/storage/' . $path,
+                    'sort_order' => $index + 1,
+                ]);
+            }
+        }
+
+        if (!empty($validated['variants'])) {
+            foreach ($product->variants as $i => $variant) {
+                if (isset($validated['variants'][$i]['image_index']) && isset($savedImages[$validated['variants'][$i]['image_index']])) {
+                    $variant->update(['product_image_id' => $savedImages[$validated['variants'][$i]['image_index']]->id]);
+                }
+            }
+        }
+
+        return response()->json($product->load(['variants', 'images']), 201);
     }
 
     /**
@@ -206,61 +243,98 @@ class ProductController extends Controller
             'series_id' => 'nullable|exists:series,id',
             'description' => 'nullable|string',
             'status' => 'required|string|in:draft,active,archived',
+            'sku' => 'nullable|string|max:100',
+            'variants' => 'nullable|array',
+            'variants.*.id' => 'nullable',
+            'variants.*.price' => 'required|numeric|min:0',
+            'variants.*.stock_quantity' => 'required|integer|min:0',
+            'variants.*.sku' => 'required|string|max:100',
+            'variants.*.color' => 'nullable|string',
+            'variants.*.storage_gb' => 'nullable|integer',
+            'variants.*.ram_gb' => 'nullable|integer',
+            'variants.*.processor' => 'nullable|string',
+            'variants.*.screen_size' => 'nullable|numeric',
+            'variants.*.image_index' => 'nullable|integer',
+            'variants.*.existing_image_id' => 'nullable|integer|exists:product_images,id',
+            'images' => 'nullable|array',
+            'images.*' => 'image|max:5120',
+            'deleted_variants' => 'nullable|array',
+            'deleted_variants.*' => 'integer|exists:product_variants,id',
+            'deleted_images' => 'nullable|array',
+            'deleted_images.*' => 'integer|exists:product_images,id',
         ]);
-
-        // Find all siblings in the group
-        $siblings = Product::where('name', $product->name)
-            ->where(function ($q) use ($product) {
-                if ($product->series_id) {
-                    $q->where('series_id', $product->series_id);
-                } else {
-                    $q->whereNull('series_id');
-                }
-            })
-            ->get();
 
         $nameChanged = $validated['name'] !== $product->name;
-
-        foreach ($siblings as $sibling) {
-            $updateData = [
-                'name' => $validated['name'],
-                'brand_id' => $validated['brand_id'],
-                'category_id' => $validated['category_id'],
-                'series_id' => $validated['series_id'],
-                'description' => $validated['description'],
-                'status' => $validated['status'],
-            ];
-
-            // Regenerate slug if name changed, preserving the config suffix
-            if ($nameChanged) {
-                $oldBase = Str::slug($product->name);
-                $newBase = Str::slug($validated['name']);
-                $oldSlug = $sibling->slug;
-
-                if (Str::startsWith($oldSlug, $oldBase)) {
-                    $suffix = Str::substr($oldSlug, Str::length($oldBase));
-                    $newSlug = $newBase . $suffix;
-                } else {
-                    $newSlug = $newBase . '-' . $sibling->id;
-                }
-
-                if (Product::where('slug', $newSlug)->where('id', '!=', $sibling->id)->exists()) {
-                    $newSlug .= '-' . time();
-                }
-                $updateData['slug'] = $newSlug;
+        if ($nameChanged) {
+            $slug = Str::slug($validated['name']);
+            if (Product::where('slug', $slug)->where('id', '!=', $id)->exists()) {
+                $slug .= '-' . time();
             }
-
-            if ($validated['status'] === 'active' && !$sibling->published_at) {
-                $updateData['published_at'] = now();
-            }
-
-            $sibling->update($updateData);
+            $product->slug = $slug;
         }
 
-        return response()->json([
-            'message' => 'Product updated across ' . $siblings->count() . ' configurations',
-            'count' => $siblings->count(),
+        $product->update([
+            'name' => $validated['name'],
+            'brand_id' => $validated['brand_id'],
+            'category_id' => $validated['category_id'],
+            'series_id' => $validated['series_id'] ?? null,
+            'description' => $validated['description'] ?? null,
+            'status' => $validated['status'],
         ]);
+
+        if ($validated['status'] === 'active' && !$product->published_at) {
+            $product->update(['published_at' => now()]);
+        }
+
+        if (!empty($validated['deleted_variants'])) {
+            $product->variants()->whereIn('id', $validated['deleted_variants'])->delete();
+        }
+        if (!empty($validated['deleted_images'])) {
+            $product->images()->whereIn('id', $validated['deleted_images'])->delete();
+        }
+
+        $savedImages = [];
+        if ($request->hasFile('images')) {
+            $maxSort = $product->images()->max('sort_order') ?? 0;
+            foreach ($request->file('images') as $index => $file) {
+                $path = $file->store('products', 'public');
+                $savedImages[$index] = $product->images()->create([
+                    'url' => '/storage/' . $path,
+                    'sort_order' => $maxSort + $index + 1,
+                ]);
+            }
+        }
+
+        if (!empty($validated['variants'])) {
+            foreach ($validated['variants'] as $vData) {
+                $varId = $vData['id'] ?? null;
+                $vFields = [
+                    'price' => $vData['price'],
+                    'stock_quantity' => $vData['stock_quantity'],
+                    'sku' => $vData['sku'],
+                    'color' => $vData['color'] ?? null,
+                    'storage_gb' => $vData['storage_gb'] ?? null,
+                    'ram_gb' => $vData['ram_gb'] ?? null,
+                    'processor' => $vData['processor'] ?? null,
+                    'screen_size' => $vData['screen_size'] ?? null,
+                ];
+
+                if (isset($vData['image_index']) && isset($savedImages[$vData['image_index']])) {
+                    $vFields['product_image_id'] = $savedImages[$vData['image_index']]->id;
+                } elseif (isset($vData['existing_image_id'])) {
+                    $vFields['product_image_id'] = $vData['existing_image_id'];
+                }
+
+                if ($varId && !str_starts_with((string)$varId, 'var-')) {
+                    $product->variants()->where('id', $varId)->update($vFields);
+                } else {
+                    $product->variants()->create($vFields);
+                }
+            }
+            $product->update(['stock' => $product->variants()->sum('stock_quantity')]);
+        }
+
+        return response()->json($product->load(['variants', 'images']));
     }
 
     /**

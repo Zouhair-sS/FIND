@@ -146,7 +146,7 @@ export default function CategoryClient({ category }: { category: Category }) {
       let label = String(val);
       if (slug === "ram_gb") label += "GB";
       if (slug === "storage_gb") {
-        label = Number(val) >= 1024 ? `${Number(val) / 1024}TB` : `${val}GB`;
+        label = Number(val) >= 1000 ? (Number(val) % 1024 === 0 ? `${Number(val) / 1024}TB` : `${Number(val) / 1000}TB`) : `${val}GB`;
       }
       if (slug === "screen_size") label += '"';
       activeChips.push({ slug, value: val, label });
