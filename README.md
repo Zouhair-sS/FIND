@@ -47,6 +47,9 @@ php artisan key:generate
 # Run database migrations and seeders (populates demo products)
 php artisan migrate --seed
 
+# Create the storage symlink (required for uploaded images to display)
+php artisan storage:link
+
 # Start the Laravel development server (runs on http://127.0.0.1:8000)
 php artisan serve
 ```
@@ -57,9 +60,6 @@ cd frontend
 
 # Install Node dependencies
 npm install
-
-# Set up your environment file (if applicable)
-cp .env.example .env.local
 
 # Start the Next.js development server (runs on http://localhost:3000)
 npm run dev

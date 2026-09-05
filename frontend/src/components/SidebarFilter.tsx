@@ -157,7 +157,7 @@ function FilterSection({
         <div className="mt-3 space-y-2 max-h-[240px] overflow-y-auto custom-scrollbar pr-1">
           {filterGroup.slug === "category" ? (
             (() => {
-              const ACCESSORY_SUBCATEGORIES = ['Headphones & Earbuds', 'Mice', 'Keyboards', 'Smartwatches'];
+              const ACCESSORY_SUBCATEGORIES = ['Headphones & Earbuds', 'Mice', 'Keyboards', 'SmartWatches'];
               const mainOptions = filterGroup.values.filter(opt => !ACCESSORY_SUBCATEGORIES.includes(String(opt.value)));
               const accessoryOptions = filterGroup.values.filter(opt => ACCESSORY_SUBCATEGORIES.includes(String(opt.value)));
               

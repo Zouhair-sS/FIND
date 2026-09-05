@@ -41,7 +41,7 @@ const ACCESSORIES_SUBCATEGORIES = [
   },
   {
     label: "Smartwatches",
-    href: "/accessories-smartwatches",
+    href: "/smartwatches",
     icon: "/images/UI/smartwatch.png",
     desc: "Apple Watch, Galaxy & more"
   },
